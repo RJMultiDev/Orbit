@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 sealed class LoginState {
     object Initial : LoginState()
@@ -53,7 +54,7 @@ class LoginViewModel : ViewModel() {
     private fun startPolling(qrcodeKey: String) {
         pollJob = viewModelScope.launch {
             while (true) {
-                delay(3000)
+                delay(1000.milliseconds)
                 try {
                     val pollData = LoginApi.getLoginState(qrcodeKey)
                     when (pollData.code) {
@@ -65,7 +66,7 @@ class LoginViewModel : ViewModel() {
                             // Scanned, waiting for confirmation
                             if (_state.value is LoginState.QRCodeReady) {
                                 val current = _state.value as LoginState.QRCodeReady
-                                _state.value = current.copy(message = "已扫码，请在手机上确认登录")
+                                _state.value = current.copy(message = "已扫码，请在手机上继续操作")
                             }
                         }
                         86101 -> {

@@ -30,5 +30,6 @@ data class Reply(
     val childCount: Int = 0,
     val isDynamic: Boolean = false,
     val childMsgList: List<Reply> = emptyList(),
-    val isTop: Boolean = false
+    val isTop: Boolean = false,
+    val emotes: Map<String, Emote> = emptyMap()
 )

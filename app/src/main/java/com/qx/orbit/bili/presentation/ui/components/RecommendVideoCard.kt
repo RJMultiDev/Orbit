@@ -34,6 +34,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 import com.qx.orbit.bili.data.model.VideoCard
+import com.qx.orbit.bili.presentation.util.parseHighlightedTitle
 
 @Composable
 fun RecommendVideoCard(
@@ -89,10 +90,10 @@ fun RecommendVideoCard(
                     Spacer(modifier = Modifier.height(6.dp))
                     if (item.title.contains("<em")) {
                         Text(
-                            text = com.qx.orbit.bili.presentation.util.parseHighlightedTitle(item.title),
+                            text = parseHighlightedTitle(item.title),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = Color.White
                         )
                     } else {
@@ -100,7 +101,7 @@ fun RecommendVideoCard(
                             text = item.title,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = Color.White
                         )
                     }

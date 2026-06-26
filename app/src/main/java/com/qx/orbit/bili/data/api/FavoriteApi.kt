@@ -103,7 +103,15 @@ object FavoriteApi {
     internal data class FavStateItem(
         @SerializedName("id") val id: Long = 0,
         @SerializedName("title") val title: String? = null,
-        @SerializedName("fav_state") val fav_state: Int = 0
+        @SerializedName("fav_state") val fav_state: Int = 0,
+        @SerializedName("media_count") val media_count: Int = 0
+    )
+
+    data class FavFolderUI(
+        val id: Long,
+        val name: String,
+        val mediaCount: Int,
+        val isFav: Boolean
     )
 
     suspend fun getFavoriteFolders(mid: Long): List<FavoriteFolder> = withContext(Dispatchers.IO) {
@@ -160,31 +168,29 @@ object FavoriteApi {
         Pair(resp.data.has_more, opusList)
     }
 
-    suspend fun getFavoriteState(aid: Long): Triple<List<String>, List<Long>, List<Boolean>> = withContext(Dispatchers.IO) {
-        val url = "https://api.bilibili.com/x/v3/fav/folder/created/list-all?type=2&rid=$aid&up_mid="
+    suspend fun getFavoriteState(aid: Long): List<FavFolderUI> = withContext(Dispatchers.IO) {
+        val mid = CookieManager.getInfoFromCookie("DedeUserID")
+        val url = "https://api.bilibili.com/x/v3/fav/folder/created/list-all?type=2&rid=$aid&up_mid=$mid"
         val json = httpGet(url)
         val resp: ApiResponse<FavStateData>? = GsonConfig.gson.fromJson(json, object : TypeToken<ApiResponse<FavStateData>>() {}.type)
-        if (resp == null || !resp.isSuccess || resp.data == null) return@withContext Triple(emptyList(), emptyList(), emptyList())
-        val names = mutableListOf<String>()
-        val ids = mutableListOf<Long>()
-        val states = mutableListOf<Boolean>()
+        if (resp == null || !resp.isSuccess || resp.data == null) return@withContext emptyList()
+        val folders = mutableListOf<FavFolderUI>()
         resp.data.list?.filterNotNull()?.forEach {
-            names.add(it.title ?: "")
-            ids.add(it.id)
-            states.add(it.fav_state == 1)
+            folders.add(FavFolderUI(it.id, it.title ?: "", it.media_count, it.fav_state == 1))
         }
-        Triple(names, ids, states)
+        folders
     }
 
     suspend fun addFavorite(aid: Long, fid: Long): Int = withContext(Dispatchers.IO) {
         val body = FormBody.Builder()
             .add("rid", aid.toString())
             .add("type", "2")
-            .add("media_id", fid.toString())
+            .add("add_media_ids", fid.toString())
+            .add("del_media_ids", "")
             .add("csrf", CookieManager.getCsrf())
             .build()
         val request = Request.Builder()
-            .url("https://api.bilibili.com/medialist/gateway/coll/resource/deal")
+            .url("https://api.bilibili.com/x/v3/fav/resource/deal")
             .post(body)
             .addHeader("Cookie", CookieManager.getCookie())
             .addHeader("User-Agent", USER_AGENT)

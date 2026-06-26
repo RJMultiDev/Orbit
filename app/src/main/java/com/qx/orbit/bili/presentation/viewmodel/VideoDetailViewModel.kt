@@ -2,6 +2,7 @@ package com.qx.orbit.bili.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.qx.orbit.bili.data.api.FavoriteApi
 import com.qx.orbit.bili.data.api.LikeCoinFavApi
 import com.qx.orbit.bili.data.api.RecommendApi
 import com.qx.orbit.bili.data.api.ReplyApi
@@ -9,6 +10,7 @@ import com.qx.orbit.bili.data.api.VideoInfoApi
 import com.qx.orbit.bili.data.model.Reply
 import com.qx.orbit.bili.data.model.VideoCard
 import com.qx.orbit.bili.data.model.VideoInfo
+import com.qx.orbit.bili.data.api.EmoteApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +30,9 @@ class VideoDetailViewModel : ViewModel() {
     private val _relatedVideos = MutableStateFlow<List<VideoCard>>(emptyList())
     val relatedVideos: StateFlow<List<VideoCard>> = _relatedVideos.asStateFlow()
 
+    private val _favoriteFolders = MutableStateFlow<List<FavoriteApi.FavFolderUI>?>(null)
+    val favoriteFolders: StateFlow<List<FavoriteApi.FavFolderUI>?> = _favoriteFolders.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -36,6 +41,12 @@ class VideoDetailViewModel : ViewModel() {
     
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _emotes = MutableStateFlow<List<EmoteApi.EmotePackage>?>(null)
+    val emotes: StateFlow<List<EmoteApi.EmotePackage>?> = _emotes.asStateFlow()
+
+    private val _isEmoteLoading = MutableStateFlow(false)
+    val isEmoteLoading: StateFlow<Boolean> = _isEmoteLoading.asStateFlow()
 
     var bvid: String = ""
     var aid: Long = 0
@@ -89,6 +100,29 @@ class VideoDetailViewModel : ViewModel() {
         }
     }
 
+    fun likeReply(rpid: Long, isLiked: Boolean) {
+        viewModelScope.launch {
+            try {
+                val action = if (isLiked) 0 else 1 // 1 for like, 0 for cancel
+                val result = ReplyApi.likeReply(aid, rpid, action)
+                if (result == 0) {
+                    _replies.value = _replies.value.map { reply ->
+                        if (reply.rpid == rpid) {
+                            reply.copy(
+                                liked = !isLiked,
+                                likeCount = reply.likeCount + (if (isLiked) -1 else 1)
+                            )
+                        } else {
+                            reply
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     fun toggleLike() {
         val info = _videoInfo.value ?: return
         viewModelScope.launch {
@@ -110,17 +144,17 @@ class VideoDetailViewModel : ViewModel() {
         }
     }
     
-    fun toggleCoin() {
+    fun doCoin(multiply: Int) {
         val info = _videoInfo.value ?: return
         viewModelScope.launch {
             try {
                 val isCoined = (info.stats?.coined ?: 0) > 0
                 if (isCoined) return@launch // Bilibili cannot cancel coin easily via simple API
-                val result = LikeCoinFavApi.coin(aid, 1) // throw 1 coin
+                val result = LikeCoinFavApi.coin(aid, multiply)
                 if (result == 0) {
                     val newStats = info.stats?.copy(
-                        coined = 1,
-                        coin = info.stats.coin + 1
+                        coined = multiply,
+                        coin = info.stats.coin + multiply
                     )
                     _videoInfo.value = info.copy(stats = newStats)
                 }
@@ -130,8 +164,75 @@ class VideoDetailViewModel : ViewModel() {
         }
     }
     
-    fun toggleFavorite() {
-        // Implement favorite if needed, requiring folder IDs.
-        // For simplicity, we can leave it as a stub or implement default folder.
+    fun loadFavoriteFolders() {
+        viewModelScope.launch {
+            try {
+                val result = FavoriteApi.getFavoriteState(aid)
+                _favoriteFolders.value = result
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun doFavorite(fid: Long) {
+        val info = _videoInfo.value ?: return
+        viewModelScope.launch {
+            try {
+                val result = FavoriteApi.addFavorite(aid, fid)
+                if (result == 0) {
+                    val newStats = info.stats?.copy(
+                        favoured = true,
+                        favorite = info.stats.favorite + 1
+                    )
+                    _videoInfo.value = info.copy(stats = newStats)
+                    // Optionally reload folders
+                    loadFavoriteFolders()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun loadEmotes() {
+        if (_emotes.value != null) return
+        _isEmoteLoading.value = true
+        viewModelScope.launch {
+            try {
+                val result = EmoteApi.getEmotes(EmoteApi.BUSINESS_REPLY)
+                _emotes.value = result
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isEmoteLoading.value = false
+            }
+        }
+    }
+
+    fun sendReply(text: String, root: Long, parent: Long, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val (code, reply) = ReplyApi.sendReply(
+                    oid = aid,
+                    root = root,
+                    parent = parent,
+                    text = text,
+                    type = ReplyApi.REPLY_TYPE_VIDEO
+                )
+                if (code == 0) {
+                    onSuccess()
+                    // Refetch replies to show the new comment
+                    if (root == 0L) {
+                        loadReplies(reset = true)
+                    }
+                } else {
+                    onError("发送失败 (code: $code)")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onError(e.localizedMessage ?: "网络错误")
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
 package com.qx.orbit.bili.presentation
+import com.qx.orbit.bili.presentation.component.WysTimeText
 
 import android.app.Activity
 import android.content.Intent
@@ -10,7 +11,25 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import kotlin.math.roundToInt
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -32,10 +51,21 @@ import androidx.navigation.NavHostController
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
+import androidx.wear.compose.material3.lazy.rememberTransformationSpec
+import androidx.wear.compose.material3.lazy.transformedHeight
+import androidx.compose.foundation.focusable
 import androidx.wear.compose.material3.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.wear.compose.foundation.pager.rememberPagerState
+import androidx.wear.compose.foundation.pager.HorizontalPager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.material3.Text as Material3Text
+import androidx.compose.material3.Text as Material3Text
 import coil.compose.AsyncImage
 import com.qx.orbit.bili.data.model.*
 import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
+import com.qx.orbit.bili.presentation.util.parseHighlightedTitle
 import com.qx.orbit.bili.presentation.viewmodel.SearchTab
 import com.qx.orbit.bili.presentation.viewmodel.SearchViewModel
 import java.net.URLEncoder
@@ -78,7 +108,7 @@ fun SearchInputScreen(navController: NavHostController) {
                 value = searchText,
                 onValueChange = { searchText = it },
                 placeholder = {
-                    androidx.compose.material3.Text(
+                    Material3Text(
                         "输入搜索词",
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -135,86 +165,286 @@ fun SearchInputScreen(navController: NavHostController) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController: NavHostController) {
     val currentTab by viewModel.currentTab.collectAsState()
-    val results by viewModel.results.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
+    val resultsMap by viewModel.results.collectAsState()
+    val isLoadingMap by viewModel.isLoading.collectAsState()
+    val errorMessageMap by viewModel.errorMessage.collectAsState()
+    var showTabMenu by remember { mutableStateOf(false) }
 
-    val listState = rememberTransformingLazyColumnState()
+    val pagerState = rememberPagerState(
+        initialPage = SearchTab.entries.indexOf(currentTab),
+        pageCount = { SearchTab.entries.size }
+    )
 
     LaunchedEffect(query) {
         viewModel.performSearch(query)
     }
 
-    ScreenScaffold(
-        scrollState = listState,
-        modifier = Modifier.fillMaxSize()
-    ) { contentPadding ->
-        TransformingLazyColumn(
-            state = listState,
-            contentPadding = contentPadding,
+    LaunchedEffect(pagerState.currentPage) {
+        val tab = SearchTab.entries[pagerState.currentPage]
+        viewModel.switchTab(tab)
+    }
+
+    LaunchedEffect(currentTab) {
+        val tabIndex = SearchTab.entries.indexOf(currentTab)
+        if (pagerState.currentPage != tabIndex) {
+            pagerState.animateScrollToPage(tabIndex)
+        }
+    }
+
+    val focusRequesters = remember { List(4) { FocusRequester() } }
+    LaunchedEffect(showTabMenu, currentTab) {
+        if (!showTabMenu) {
+            val tabIndex = SearchTab.entries.indexOf(currentTab)
+            try { focusRequesters[tabIndex].requestFocus() } catch (e: Exception) {}
+        }
+    }
+
+    var actualTitleHeightPx by remember { mutableFloatStateOf(0f) }
+    var titleOffset by remember { mutableFloatStateOf(0f) }
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                if (actualTitleHeightPx > 0f) {
+                    titleOffset = (titleOffset + delta).coerceIn(-actualTitleHeightPx, 0f)
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection)) {
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier.fillMaxSize()
-        ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    SearchTab.entries.forEach { tab ->
-                        Text(
-                            text = tab.title,
-                            color = if (tab == currentTab) MaterialTheme.colorScheme.primary else Color.Gray,
-                            fontSize = 12.sp,
-                            modifier = Modifier.clickable { viewModel.switchTab(tab) }.padding(4.dp)
-                        )
-                    }
-                }
-            }
-
-            itemsIndexed(results) { index, item ->
-                if (index >= results.size - 3 && !isLoading) {
-                    LaunchedEffect(index) {
-                        viewModel.loadMore()
-                    }
-                }
-
-                Box(modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
-                    when (item) {
-                        is VideoCard -> RecommendVideoCard(item = item, onClick = {
-                            navController.navigate("detail/${item.bvid}/${item.aid}")
-                        })
-                        is LiveRoom -> LiveRoomCard(item = item, onClick = {
-                            // navController.navigate("live_room/${item.roomid}")
-                        })
-                        is UserInfo -> UserInfoCard(item = item, onClick = {
-                            // navController.navigate("user/${item.mid}")
-                        })
-                        is ArticleCard -> ArticleCardItem(item = item, onClick = {
-                            // navController.navigate("article/${item.id}")
-                        })
-                    }
-                }
-            }
-
-            if (isLoading) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    }
-                }
-            }
-
-            if (errorMessage != null && results.isEmpty()) {
-                item {
-                    Text(text = errorMessage ?: "Error", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+        ) { page ->
+            val isFocusedPage = pagerState.currentPage == page
+            LaunchedEffect(isFocusedPage) {
+                if (isFocusedPage) {
+                    try { focusRequesters[page].requestFocus() } catch (e: Exception) {}
                 }
             }
             
-            if (results.isEmpty() && !isLoading) {
-                item {
-                    Text(text = "没有找到相关结果", color = Color.Gray, modifier = Modifier.padding(16.dp))
+            val tab = SearchTab.entries[page]
+            val results = resultsMap[tab] ?: emptyList()
+            val isLoading = isLoadingMap[tab] ?: false
+            val errorMessage = errorMessageMap[tab]
+
+            val listState = rememberTransformingLazyColumnState()
+            val transformationSpec = rememberTransformationSpec()
+            ScreenScaffold(
+                timeText = { WysTimeText() },
+                scrollState = listState,
+                modifier = Modifier.fillMaxSize().focusRequester(focusRequesters[page])
+            ) { contentPadding ->
+                TransformingLazyColumn(
+                    state = listState,
+                    contentPadding = contentPadding,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    item {
+                        Spacer(modifier = Modifier.height(36.dp))
+                    }
+
+                    itemsIndexed(results) { index, item ->
+                        if (index >= results.size - 3 && !isLoading) {
+                            LaunchedEffect(index) {
+                                viewModel.loadMore(tab)
+                            }
+                        }
+
+                        // Reduced gap
+                        Box(modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp).transformedHeight(this@itemsIndexed, transformationSpec)) {
+                            when (item) {
+                                is VideoCard -> RecommendVideoCard(
+                                    item = item, 
+                                    onClick = {
+                                        navController.navigate("detail/${item.bvid}/${item.aid}")
+                                    },
+                                    transformation = SurfaceTransformation(transformationSpec)
+                                )
+                                is LiveRoom -> LiveRoomCard(
+                                    item = item, 
+                                    onClick = {
+                                        // navController.navigate("live_room/${item.roomid}")
+                                    },
+                                    transformation = SurfaceTransformation(transformationSpec)
+                                )
+                                is UserInfo -> UserInfoCard(
+                                    item = item, 
+                                    onClick = {
+                                        navController.navigate("user_space/${item.mid}")
+                                    },
+                                    transformation = SurfaceTransformation(transformationSpec)
+                                )
+                                is ArticleCard -> ArticleCardItem(
+                                    item = item, 
+                                    onClick = {
+                                        // navController.navigate("article/${item.id}")
+                                    },
+                                    transformation = SurfaceTransformation(transformationSpec)
+                                )
+                            }
+                        }
+                    }
+
+                    if (isLoading) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+
+                    if (errorMessage != null && results.isEmpty()) {
+                        item {
+                            Text(text = errorMessage, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+                        }
+                    }
+                    
+                    if (results.isEmpty() && !isLoading) {
+                        item {
+                            Text(text = "没有找到相关结果", color = Color.Gray, modifier = Modifier.padding(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Floating Menu Button
+        val localDensity = LocalDensity.current
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset { IntOffset(0, titleOffset.roundToInt()) }
+                .padding(top = 12.dp)
+                .zIndex(2f)
+                .onGloballyPositioned { coordinates ->
+                    actualTitleHeightPx = coordinates.size.height.toFloat() + with(localDensity) { 12.dp.toPx() }
+                }
+        ) {
+            Box(
+                modifier = Modifier
+                    .height(28.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .clickable { showTabMenu = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val currentDisplayTab = SearchTab.entries.getOrNull(pagerState.currentPage) ?: currentTab
+                    Text(
+                        text = currentDisplayTab.title,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "切换",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        // Tab Menu Overlay
+        AnimatedVisibility(
+            visible = showTabMenu,
+            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+            modifier = Modifier.fillMaxSize().zIndex(1f)
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                val menuListState = rememberTransformingLazyColumnState()
+                val menuFocusRequester = remember { FocusRequester() }
+                val menuTransformationSpec = rememberTransformationSpec()
+
+                LaunchedEffect(showTabMenu) {
+                    if (showTabMenu) {
+                        try { menuFocusRequester.requestFocus() } catch (_: Exception) {}
+                    }
+                }
+
+                ScreenScaffold(
+                    timeText = { WysTimeText() },
+                    scrollState = menuListState,
+                    modifier = Modifier.focusRequester(menuFocusRequester)
+                ) { contentPadding ->
+                    TransformingLazyColumn(
+                        state = menuListState,
+                        contentPadding = contentPadding,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .transformedHeight(this, menuTransformationSpec)
+                                    .graphicsLayer {
+                                        with(menuTransformationSpec) {
+                                            applyContainerTransformation(scrollProgress)
+                                        }
+                                    }
+                            ) {
+                                ListHeader(
+                                    modifier = Modifier.fillMaxWidth().clickable { showTabMenu = false }
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Close Menu", tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(1.dp))
+                                        Text(text = "收起", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        items(SearchTab.entries.size) { index ->
+                            val tab = SearchTab.entries[index]
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .transformedHeight(this, menuTransformationSpec)
+                                    .graphicsLayer {
+                                        with(menuTransformationSpec) {
+                                            applyContainerTransformation(scrollProgress)
+                                        }
+                                    }
+                            ) {
+                                val isSelected = currentTab == tab
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                                        .clip(CircleShape)
+                                        .height(48.dp)
+                                        .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer, CircleShape)
+                                        .clickable {
+                                            viewModel.switchTab(tab)
+                                            showTabMenu = false
+                                        },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = tab.title,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -222,15 +452,21 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
 }
 
 @Composable
-fun LiveRoomCard(item: LiveRoom, onClick: () -> Unit) {
+fun LiveRoomCard(
+    item: LiveRoom, 
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    transformation: SurfaceTransformation? = null
+) {
     val coverUrl = item.user_cover.ifEmpty { item.cover }.ifEmpty { item.keyframe }
     val finalCover = if (coverUrl.contains("@")) coverUrl else "${coverUrl}@480w_270h_1c.webp"
 
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(110.dp),
+        modifier = modifier.fillMaxWidth().height(110.dp),
         shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(0.dp)
+        contentPadding = PaddingValues(0.dp),
+        transformation = transformation
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
@@ -260,9 +496,9 @@ fun LiveRoomCard(item: LiveRoom, onClick: () -> Unit) {
                 Column {
                     Spacer(modifier = Modifier.height(6.dp))
                     val titleText = if (item.title.contains("<em")) {
-                        com.qx.orbit.bili.presentation.util.parseHighlightedTitle(item.title)
+                        parseHighlightedTitle(item.title)
                     } else {
-                        androidx.compose.ui.text.AnnotatedString(item.title)
+                        AnnotatedString(item.title)
                     }
                     Text(
                         text = titleText,
@@ -299,35 +535,66 @@ fun LiveRoomCard(item: LiveRoom, onClick: () -> Unit) {
 }
 
 @Composable
-fun UserInfoCard(item: UserInfo, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+fun UserInfoCard(
+    item: UserInfo, 
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    transformation: SurfaceTransformation? = null
+) {
+    Button(
+        onClick = onClick, 
+        modifier = modifier.fillMaxWidth(), 
+        transformation = transformation,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f),
+            contentColor = MaterialTheme.colorScheme.primary,
+            secondaryContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        icon = {
             AsyncImage(
                 model = item.avatar,
                 contentDescription = item.name,
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape),
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(text = item.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
-                Text(text = "粉丝: ${item.fans}", fontSize = 12.sp, color = Color.Gray)
-            }
+        },
+        label = {
+            Text(
+                text = item.name,
+                modifier = Modifier.basicMarquee(),
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        secondaryLabel = {
+            Text(
+                text = "粉丝: ${item.fans}",
+                modifier = Modifier.basicMarquee(),
+                maxLines = 1,
+                overflow = TextOverflow.Clip
+            )
         }
-    }
+    )
 }
 
 @Composable
-fun ArticleCardItem(item: ArticleCard, onClick: () -> Unit) {
+fun ArticleCardItem(
+    item: ArticleCard, 
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    transformation: SurfaceTransformation? = null
+) {
     val coverUrl = if (item.cover.contains("@")) item.cover else "${item.cover}@480w_270h_1c.webp"
 
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(110.dp),
+        modifier = modifier.fillMaxWidth().height(110.dp),
         shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(0.dp)
+        contentPadding = PaddingValues(0.dp),
+        transformation = transformation
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
@@ -357,9 +624,9 @@ fun ArticleCardItem(item: ArticleCard, onClick: () -> Unit) {
                 Column {
                     Spacer(modifier = Modifier.height(6.dp))
                     val titleText = if (item.title.contains("<em")) {
-                        com.qx.orbit.bili.presentation.util.parseHighlightedTitle(item.title)
+                        parseHighlightedTitle(item.title)
                     } else {
-                        androidx.compose.ui.text.AnnotatedString(item.title)
+                        AnnotatedString(item.title)
                     }
                     Text(
                         text = titleText,

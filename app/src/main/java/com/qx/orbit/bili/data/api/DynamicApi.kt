@@ -235,13 +235,15 @@ object DynamicApi {
         val topicTitle = topic?.optString("name", "") ?: ""
 
         val desc = dynamicModule.optJSONObject("desc")
-        val descContent = desc?.optString("text", "") ?: ""
-
-        var content = descContent.ifEmpty { descText }
+        var content = desc?.optString("text", "") ?: ""
 
         val majorObject: Any? = null
         val commentId: Long
         val commentType: Int
+        val images = mutableListOf<String>()
+        var cover = ""
+        var bvid = ""
+        var archiveTitle = ""
 
         when (majorType) {
             "MAJOR_TYPE_ARCHIVE" -> {
@@ -249,6 +251,9 @@ object DynamicApi {
                 commentId = archive?.optLong("aid", 0) ?: 0
                 commentType = 1
                 val title = archive?.optString("title", "") ?: ""
+                archiveTitle = title
+                cover = archive?.optString("cover", "") ?: ""
+                bvid = archive?.optString("bvid", "") ?: ""
                 if (content.isEmpty()) content = title
             }
             "MAJOR_TYPE_DRAW" -> {
@@ -257,10 +262,34 @@ object DynamicApi {
                 commentType = 11
                 val drawItems = draw?.optJSONArray("items")
                 if (drawItems != null && drawItems.length() > 0) {
-                    val firstItem = drawItems.optJSONObject(0)
+                    for (i in 0 until drawItems.length()) {
+                        val item = drawItems.optJSONObject(i)
+                        val src = item?.optString("src", "")
+                        if (!src.isNullOrEmpty()) {
+                            images.add(src)
+                        }
+                    }
                     val drawDesc = draw?.optString("desc", "")
                     if (content.isEmpty() && !drawDesc.isNullOrEmpty()) content = drawDesc
                 }
+            }
+            "MAJOR_TYPE_OPUS" -> {
+                val opus = majorObj?.optJSONObject("opus")
+                commentId = 0
+                commentType = 11 // Just a default, not strictly used
+                val pics = opus?.optJSONArray("pics")
+                if (pics != null && pics.length() > 0) {
+                    for (i in 0 until pics.length()) {
+                        val pic = pics.optJSONObject(i)
+                        val url = pic?.optString("url", "")
+                        if (!url.isNullOrEmpty()) {
+                            images.add(url)
+                        }
+                    }
+                }
+                val summary = opus?.optJSONObject("summary")?.optString("text", "") ?: ""
+                val title = opus?.optString("title", "") ?: ""
+                if (content.isEmpty()) content = summary.ifEmpty { title }
             }
             "MAJOR_TYPE_ARTICLE" -> {
                 val article = majorObj?.optJSONObject("article")
@@ -329,7 +358,11 @@ object DynamicApi {
             major_type = majorType,
             major_object = majorObject,
             dynamic_forward = dynamicForward,
-            canDelete = canDelete
+            canDelete = canDelete,
+            images = images,
+            cover = cover,
+            bvid = bvid,
+            archiveTitle = archiveTitle
         )
     }
 

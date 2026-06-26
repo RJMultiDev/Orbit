@@ -13,7 +13,11 @@ data class Dynamic(
     val major_type: String = "",
     val major_object: Any? = null,
     val dynamic_forward: Dynamic? = null,
-    val canDelete: Boolean = false
+    val canDelete: Boolean = false,
+    val images: List<String> = emptyList(),
+    val cover: String = "",
+    val bvid: String = "",
+    val archiveTitle: String = ""
 ) {
     companion object {
         const val DYNAMIC_TYPE_UGC_SEASON = "DYNAMIC_TYPE_UGC_SEASON"

@@ -183,9 +183,19 @@ object UserInfoApi {
 
         val noticeUrl = "https://api.bilibili.com/x/space/notice?mid=$mid"
         val noticeJson = httpGet(noticeUrl)
-        val noticeType = object : TypeToken<ApiResponse<NoticeData>>() {}.type
-        val noticeResp: ApiResponse<NoticeData>? = GsonConfig.gson.fromJson(noticeJson, noticeType)
-        val notice = noticeResp?.data?.notice ?: ""
+        var notice = ""
+        try {
+            val noticeObj = org.json.JSONObject(noticeJson)
+            if (noticeObj.optInt("code") == 0) {
+                val dataObj = noticeObj.opt("data")
+                if (dataObj is String) {
+                    notice = dataObj
+                } else if (dataObj is org.json.JSONObject) {
+                    notice = dataObj.optString("notice", "")
+                }
+            }
+        } catch (e: Exception) {
+        }
 
         val accInfoUrl = WbiSigner.signUrl("https://api.bilibili.com/x/space/wbi/acc/info?mid=$mid")
         val accJson = httpGet(accInfoUrl)
@@ -283,11 +293,12 @@ object UserInfoApi {
         val vlist = data.list?.vlist
         if (vlist.isNullOrEmpty()) return@withContext Pair(1, emptyList<VideoCard>())
         val cards = vlist.map { item ->
+            val coverUrl = item.pic?.replace("http://", "https://")?.let { if (it.startsWith("//")) "https:$it" else it } ?: ""
             VideoCard(
                 title = item.title ?: "",
                 upName = "",
                 view = StringUtil.toWan(item.play.toLong()),
-                cover = item.pic ?: "",
+                cover = coverUrl,
                 aid = item.aid,
                 bvid = item.bvid ?: ""
             )

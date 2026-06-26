@@ -1,70 +1,100 @@
 package com.qx.orbit.bili.presentation
 
-import android.content.Intent
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.wear.compose.foundation.pager.HorizontalPager
-import androidx.wear.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.runtime.*
-import androidx.wear.compose.material3.ListHeader
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.List
-import androidx.compose.ui.text.style.TextOverflow
-import com.qx.orbit.bili.util.formatCount
-import androidx.wear.compose.material3.SurfaceTransformation
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.wear.compose.material3.HorizontalPageIndicator
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
-import androidx.wear.compose.material3.*
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.qx.orbit.bili.presentation.theme.OrbitTheme
-import com.qx.orbit.bili.presentation.viewmodel.VideoDetailViewModel
-import com.qx.orbit.bili.data.model.VideoInfo
-import com.qx.orbit.bili.data.api.ReplyApi
-import com.qx.orbit.bili.data.model.VideoCard
-import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
-import androidx.compose.ui.res.painterResource
-import com.qx.orbit.bili.R
-import com.qx.orbit.bili.data.model.Reply
-import com.qx.orbit.bili.data.model.PlayerData
+import androidx.wear.compose.foundation.pager.HorizontalPager
+import androidx.wear.compose.foundation.pager.rememberPagerState
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.ButtonGroup
+import androidx.wear.compose.material3.Card
+import androidx.wear.compose.material3.CardDefaults
+import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.Dialog
+import androidx.wear.compose.material3.FilledIconButton
+import androidx.wear.compose.material3.HorizontalPageIndicator
+import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.IconButtonDefaults
+import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.SurfaceTransformation
+import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
-
-import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.gson.Gson
+import com.qx.orbit.bili.R
+import com.qx.orbit.bili.data.model.Emote
+import com.qx.orbit.bili.data.model.PlayerData
+import com.qx.orbit.bili.data.model.Reply
+import com.qx.orbit.bili.data.model.VideoCard
+import com.qx.orbit.bili.data.model.VideoInfo
+import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
+import com.qx.orbit.bili.presentation.viewmodel.VideoDetailViewModel
+import com.qx.orbit.bili.util.formatCount
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -78,7 +108,13 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
     val replies by viewModel.replies.collectAsState()
     val relatedVideos by viewModel.relatedVideos.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-
+    var showCoinDialog by remember { mutableStateOf(false) }
+    var showFavDialog by remember { mutableStateOf(false) }
+    
+    val emotes by viewModel.emotes.collectAsState()
+    val isEmoteLoading by viewModel.isEmoteLoading.collectAsState()
+    var showWriteReply by remember { mutableStateOf(false) }
+    var replyTarget by remember { mutableStateOf<Reply?>(null) }
     val pagerState = rememberPagerState(pageCount = { 3 })
     
     // Focus requesters for rotary input for each page
@@ -92,8 +128,7 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
         }
     }
 
-    AppScaffold {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             AnimatedContent(
                 targetState = isLoading && videoInfo == null,
                 transitionSpec = { fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300)) },
@@ -132,13 +167,27 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                                 navController.navigate("player/$encodedJson")
                             },
                             onLikeClick = { viewModel.toggleLike() },
-                            onCoinClick = { viewModel.toggleCoin() },
-                            onFavClick = { viewModel.toggleFavorite() }
+                            onCoinClick = { showCoinDialog = true },
+                            onFavClick = { 
+                                viewModel.loadFavoriteFolders()
+                                showFavDialog = true
+                            }
                         )
                         1 -> VideoCommentsPage(
                             replies = replies, 
                             focusRequester = focusRequesters[1],
-                            onLoadMore = { viewModel.loadReplies() }
+                            onLoadMore = { viewModel.loadReplies() },
+                            onLikeClick = { reply -> viewModel.likeReply(reply.rpid, reply.liked) },
+                            onReplyClick = { reply ->
+                                replyTarget = reply
+                                viewModel.loadEmotes()
+                                showWriteReply = true
+                            },
+                            onSendCommentClick = {
+                                replyTarget = null
+                                viewModel.loadEmotes()
+                                showWriteReply = true
+                            }
                         )
                         2 -> VideoRelatedPage(
                             relatedVideos = relatedVideos, 
@@ -155,8 +204,128 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
             }
             }
         }
+    }
+    
+    WriteReplyScreen(
+        visible = showWriteReply,
+        targetName = replyTarget?.sender?.name,
+        emotes = emotes,
+        onSend = { text ->
+            viewModel.sendReply(
+                text = text,
+                root = replyTarget?.root?.takeIf { it > 0 } ?: replyTarget?.rpid ?: 0L,
+                parent = replyTarget?.rpid ?: 0L,
+                onSuccess = {
+                    showWriteReply = false
+                },
+                onError = { error ->
+                    showWriteReply = false
+                }
+            )
+        },
+        onClose = { showWriteReply = false }
+    )
+    
+    Dialog(visible = showCoinDialog, onDismissRequest = { showCoinDialog = false }) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(horizontal = 24.dp)
+            ) {
+                Text(
+                    "投币",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .clickable { viewModel.doCoin(1); showCoinDialog = false }
+                            .padding(16.dp)
+                    ) {
+                        Text("1", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("币", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable { viewModel.doCoin(2); showCoinDialog = false }
+                            .padding(16.dp)
+                    ) {
+                        Text("2", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimary)
+                        Text("币", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
+            }
         }
     }
+    
+    val folders by viewModel.favoriteFolders.collectAsState()
+    Dialog(visible = showFavDialog, onDismissRequest = { showFavDialog = false }) {
+            val listState = rememberTransformingLazyColumnState()
+            val focusRequester = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                try { focusRequester.requestFocus() } catch (e: Exception) {}
+            }
+            ScreenScaffold(
+                scrollState = listState,
+                modifier = Modifier.focusRequester(focusRequester).focusable()
+            ) {
+                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    if (folders == null) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    } else if (folders!!.isEmpty()) {
+                        Text("暂无收藏夹", modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.error)
+                    } else {
+                        TransformingLazyColumn(state = listState, contentPadding = PaddingValues(16.dp)) {
+                            item { ListHeader { Text("选择收藏夹", color = MaterialTheme.colorScheme.primary) } }
+                            items(folders!!.size) { index ->
+                                val folder = folders!![index]
+                                Button(
+                                    onClick = { 
+                                        viewModel.doFavorite(folder.id)
+                                        showFavDialog = false 
+                                    },
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    contentPadding = PaddingValues(vertical = 8.dp, horizontal = 16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (folder.isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer
+                                    )
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = folder.name,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (folder.isFav) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "${folder.mediaCount} 个视频",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (folder.isFav) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 }
 @Composable
 fun VideoInfoPage(
@@ -170,7 +339,7 @@ fun VideoInfoPage(
 ) {
     val listState = rememberTransformingLazyColumnState()
     val transformationSpec = rememberTransformationSpec()
-    val isRound = LocalContext.current.resources.configuration.isScreenRound
+    val isRound = LocalConfiguration.current.isScreenRound
 
     ScreenScaffold(scrollState = listState, modifier = Modifier.focusRequester(focusRequester)) { contentPadding ->
         TransformingLazyColumn(
@@ -487,7 +656,10 @@ fun VideoInfoPage(
 fun VideoCommentsPage(
     replies: List<Reply>, 
     focusRequester: FocusRequester,
-    onLoadMore: () -> Unit
+    onLoadMore: () -> Unit,
+    onLikeClick: (Reply) -> Unit,
+    onReplyClick: (Reply) -> Unit,
+    onSendCommentClick: () -> Unit
 ) {
     val listState = rememberTransformingLazyColumnState()
     val transformationSpec = rememberTransformationSpec()
@@ -507,6 +679,16 @@ fun VideoCommentsPage(
                     )
                 }
             }
+            item {
+                Button(
+                    onClick = onSendCommentClick,
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
+                    transformation = SurfaceTransformation(transformationSpec),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("发布评论", style = MaterialTheme.typography.labelMedium)
+                }
+            }
             items(replies.size) { index ->
                 if (index == replies.size - 1) {
                     LaunchedEffect(index) { onLoadMore() }
@@ -514,7 +696,10 @@ fun VideoCommentsPage(
                 ReplyCard(
                     reply = replies[index],
                     transformation = SurfaceTransformation(transformationSpec),
-                    modifier = Modifier.transformedHeight(this, transformationSpec)
+                    modifier = Modifier.transformedHeight(this, transformationSpec),
+                    onLikeClick = { onLikeClick(replies[index]) },
+                    //onClick = { onClick(replies[index]) },
+                    onReplyClick = { onReplyClick(replies[index]) }
                 )
             }
         }
@@ -522,14 +707,21 @@ fun VideoCommentsPage(
 }
 
 @Composable
-fun ReplyCard(reply: Reply, modifier: Modifier = Modifier, transformation: SurfaceTransformation) {
+fun ReplyCard(
+    reply: Reply,
+    modifier: Modifier = Modifier,
+    transformation: SurfaceTransformation,
+    onClick: () -> Unit = {},
+    onLikeClick: () -> Unit = {},
+    onReplyClick: () -> Unit = {}
+) {
     Card(
-        onClick = { },
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = { onClick },
+        modifier = modifier.fillMaxWidth(),
         transformation = transformation,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {
-        Column {
+        Column(modifier = Modifier) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = reply.sender?.avatar,
@@ -546,18 +738,55 @@ fun ReplyCard(reply: Reply, modifier: Modifier = Modifier, transformation: Surfa
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
+            val (richText, inlineContent) = parseRichText(reply.message, reply.emotes)
             Text(
-                text = reply.message,
-                style = MaterialTheme.typography.bodySmall,
+                text = richText,
+                inlineContent = inlineContent,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "${reply.likeCount} 赞",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 10.sp
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                // Like Button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onLikeClick() }.padding(4.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.icon_like_0),
+                        contentDescription = "Like",
+                        modifier = Modifier.size(14.dp),
+                        tint = if (reply.liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${reply.likeCount}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (reply.liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                // Reply Button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onReplyClick() }.padding(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = "Reply",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "回复(${reply.childCount})",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                }
+            }
         }
     }
 }
@@ -599,4 +828,48 @@ fun VideoRelatedPage(
             }
         }
     }
+}
+
+@Composable
+fun parseRichText(text: String, emotes: Map<String, Emote>): Pair<AnnotatedString, Map<String, InlineTextContent>> {
+    val inlineContentMap = mutableMapOf<String, InlineTextContent>()
+    val annotatedString = buildAnnotatedString {
+        if (emotes.isEmpty()) {
+            append(text)
+            return@buildAnnotatedString
+        }
+        val pattern = "\\[[^\\]]+\\]".toRegex()
+        var lastIndex = 0
+        val matches = pattern.findAll(text)
+        for (match in matches) {
+            val emoteKey = match.value
+            val emote = emotes[emoteKey]
+            if (emote != null) {
+                append(text.substring(lastIndex, match.range.first))
+                val inlineId = emoteKey
+                appendInlineContent(inlineId, emoteKey)
+                if (!inlineContentMap.containsKey(inlineId)) {
+                    val sizeSp = (emote.size * 18).sp
+                    inlineContentMap[inlineId] = InlineTextContent(
+                        Placeholder(
+                            width = sizeSp,
+                            height = sizeSp,
+                            placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
+                        )
+                    ) {
+                        AsyncImage(
+                            model = emote.url,
+                            contentDescription = emote.name,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                lastIndex = match.range.last + 1
+            }
+        }
+        if (lastIndex < text.length) {
+            append(text.substring(lastIndex))
+        }
+    }
+    return Pair(annotatedString, inlineContentMap)
 }

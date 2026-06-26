@@ -46,7 +46,7 @@ object WbiSigner {
         val subUrl = wbiImg["sub_url"] as? String ?: return ""
         val rawKey = imgUrl.substringAfterLast("/").substringBefore(".") +
                 subUrl.substringAfterLast("/").substringBefore(".")
-        val key = rawKey.map { MIXIN_KEY_ENC_TAB[it.code] }.joinToString("").take(32)
+        val key = MIXIN_KEY_ENC_TAB.map { index -> if (index < rawKey.length) rawKey[index].toString() else "" }.joinToString("").take(32)
         mixinKey = key
         return key
     }

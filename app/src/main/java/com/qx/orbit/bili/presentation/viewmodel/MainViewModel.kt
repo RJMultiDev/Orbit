@@ -38,8 +38,12 @@ class MainViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            if (!com.qx.orbit.bili.data.remote.CookieManager.getCookie().contains("buvid3")) {
-                com.qx.orbit.bili.data.api.CookiesApi.checkCookies()
+            try {
+                if (!com.qx.orbit.bili.data.remote.CookieManager.getCookie().contains("buvid3")) {
+                    com.qx.orbit.bili.data.api.CookiesApi.checkCookies()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
             fetchNavInfo()
             loadMore()
@@ -71,6 +75,9 @@ class MainViewModel : ViewModel() {
             _errorMessage.value = null
             try {
                 if (reset) {
+                    if (_navInfo.value == null || !_navInfo.value!!.isLogin) {
+                        fetchNavInfo()
+                    }
                     if (_currentTab.value == TabMode.RECOMMEND) recommendPage = 1
                     else popularPage = 1
                 }

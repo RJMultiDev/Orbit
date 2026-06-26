@@ -1,10 +1,14 @@
 package com.qx.orbit.bili.data.api
-
 import com.qx.orbit.bili.data.model.*
+import com.qx.orbit.bili.util.*
 import com.qx.orbit.bili.data.remote.GsonConfig
 import com.qx.orbit.bili.data.remote.HttpClient
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
+import com.qx.orbit.bili.data.model.UserInfo
+import com.qx.orbit.bili.data.model.VideoInfo
+import com.qx.orbit.bili.data.model.Stats
+import com.qx.orbit.bili.data.remote.CookieManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -32,7 +36,24 @@ object VideoInfoApi {
         @SerializedName("owner") val owner: OwnerData? = null,
         @SerializedName("argue_info") val argue_info: ArgueInfoData? = null,
         @SerializedName("redirect_url") val redirect_url: String? = null,
-        @SerializedName("ugc_season") val ugc_season: UgcSeasonData? = null
+        @SerializedName("ugc_season") val ugc_season: UgcSeasonData? = null,
+        @SerializedName("req_user") val req_user: ReqUserData? = null
+    )
+
+    internal data class ReqUserData(
+        @SerializedName("attention") val attention: Int = 0,
+        @SerializedName("favorite") val favorite: Int = 0,
+        @SerializedName("like") val like: Int = 0,
+        @SerializedName("dislike") val dislike: Int = 0,
+        @SerializedName("coin") val coin: Int = 0
+    )
+
+    internal data class RelationData(
+        @SerializedName("attention") val attention: Int = 0,
+        @SerializedName("like") val like: Int = 0,
+        @SerializedName("dislik") val dislik: Int = 0,
+        @SerializedName("favorite") val favorite: Int = 0,
+        @SerializedName("coin") val coin: Int = 0
     )
 
     internal data class DescV2(@SerializedName("type") val type: Int = 0, @SerializedName("raw_text") val raw_text: String? = null, @SerializedName("biz_id") val biz_id: Long = 0)
@@ -65,7 +86,30 @@ object VideoInfoApi {
         val type = object : TypeToken<ApiResponse<VideoInfoData>>() {}.type
         val resp: ApiResponse<VideoInfoData>? = GsonConfig.gson.fromJson(json, type)
         if (resp == null || !resp.isSuccess || resp.data == null) return null
-        val videoInfo = buildVideoInfo(resp.data)
+        var videoInfo = buildVideoInfo(resp.data)
+        
+        // Fetch relation stats
+        try {
+            if (CookieManager.getCookie().isNotEmpty()) {
+                val relationUrl = "https://api.bilibili.com/x/web-interface/archive/relation?aid=${videoInfo.aid}"
+                val relationJson = httpGet(relationUrl)
+                val relationType = object : TypeToken<ApiResponse<RelationData>>() {}.type
+                val relationResp: ApiResponse<RelationData>? = GsonConfig.gson.fromJson(relationJson, relationType)
+                if (relationResp != null && relationResp.isSuccess && relationResp.data != null) {
+                    val updatedStats = videoInfo.stats?.copy(
+                        followed = relationResp.data.attention != 0,
+                        liked = relationResp.data.like != 0,
+                        disliked = relationResp.data.dislik != 0,
+                        favoured = relationResp.data.favorite != 0,
+                        coined = relationResp.data.coin
+                    )
+                    videoInfo = videoInfo.copy(stats = updatedStats)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
         return videoInfo
     }
 
@@ -158,7 +202,12 @@ object VideoInfoApi {
             Stats(
                 view = it.view, like = it.like, coin = it.coin,
                 reply = it.reply, danmaku = it.danmaku, favorite = it.favorite,
-                coin_limit = if (data.copyright == VideoInfo.COPYRIGHT_REPRINT) 1 else 2
+                coin_limit = if (data.copyright == VideoInfo.COPYRIGHT_REPRINT) 1 else 2,
+                liked = data.req_user?.like == 1,
+                coined = data.req_user?.coin ?: 0,
+                favoured = data.req_user?.favorite == 1,
+                disliked = data.req_user?.dislike == 1,
+                followed = data.req_user?.attention == 1
             )
         }
 

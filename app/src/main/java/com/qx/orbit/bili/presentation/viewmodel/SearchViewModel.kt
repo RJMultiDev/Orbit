@@ -22,65 +22,65 @@ class SearchViewModel : ViewModel() {
     private val _currentTab = MutableStateFlow(SearchTab.VIDEO)
     val currentTab: StateFlow<SearchTab> = _currentTab.asStateFlow()
 
-    private val _results = MutableStateFlow<List<Any>>(emptyList())
-    val results: StateFlow<List<Any>> = _results.asStateFlow()
+    private val _results = MutableStateFlow<Map<SearchTab, List<Any>>>(emptyMap())
+    val results: StateFlow<Map<SearchTab, List<Any>>> = _results.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    private val _isLoading = MutableStateFlow<Map<SearchTab, Boolean>>(emptyMap())
+    val isLoading: StateFlow<Map<SearchTab, Boolean>> = _isLoading.asStateFlow()
 
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+    private val _errorMessage = MutableStateFlow<Map<SearchTab, String?>>(emptyMap())
+    val errorMessage: StateFlow<Map<SearchTab, String?>> = _errorMessage.asStateFlow()
 
-    private var currentPage = 1
-    private var isEnd = false
+    private val currentPages = mutableMapOf<SearchTab, Int>()
+    private val isEnds = mutableMapOf<SearchTab, Boolean>()
 
     fun performSearch(query: String) {
         if (_searchQuery.value == query && _results.value.isNotEmpty()) return
         _searchQuery.value = query
-        currentPage = 1
-        isEnd = false
-        _results.value = emptyList()
-        fetchData()
+        SearchTab.entries.forEach {
+            currentPages[it] = 1
+            isEnds[it] = false
+        }
+        _results.value = emptyMap()
+        fetchData(_currentTab.value)
     }
 
     fun switchTab(tab: SearchTab) {
         if (_currentTab.value == tab) return
         _currentTab.value = tab
-        if (_searchQuery.value.isNotEmpty()) {
-            currentPage = 1
-            isEnd = false
-            _results.value = emptyList()
-            fetchData()
+        if (_searchQuery.value.isNotEmpty() && _results.value[tab].isNullOrEmpty()) {
+            fetchData(tab)
         }
     }
 
-    fun loadMore() {
-        if (_isLoading.value || isEnd || _searchQuery.value.isEmpty()) return
-        currentPage++
-        fetchData()
+    fun loadMore(tab: SearchTab) {
+        if (_isLoading.value[tab] == true || isEnds[tab] == true || _searchQuery.value.isEmpty()) return
+        currentPages[tab] = (currentPages[tab] ?: 1) + 1
+        fetchData(tab)
     }
 
-    private fun fetchData() {
+    private fun fetchData(tab: SearchTab) {
         val query = _searchQuery.value
-        val tab = _currentTab.value
         if (query.isEmpty()) return
 
-        _isLoading.value = true
-        _errorMessage.value = null
+        _isLoading.value = _isLoading.value.toMutableMap().apply { put(tab, true) }
+        _errorMessage.value = _errorMessage.value.toMutableMap().apply { put(tab, null) }
+        val page = currentPages[tab] ?: 1
 
         viewModelScope.launch {
             try {
                 if (tab == SearchTab.VIDEO) {
-                    val res = SearchApi.search(query, currentPage)
+                    val res = SearchApi.search(query, page)
                     if (res != null) {
-                        val items = SearchApi.getVideosFromSearchResult(res, currentPage == 1)
-                        if (items.isEmpty()) isEnd = true
-                        _results.value = _results.value + items
+                        val items = SearchApi.getVideosFromSearchResult(res, page == 1)
+                        if (items.isEmpty()) isEnds[tab] = true
+                        val currentList = _results.value[tab] ?: emptyList()
+                        _results.value = _results.value.toMutableMap().apply { put(tab, currentList + items) }
                     } else {
-                        isEnd = true
+                        isEnds[tab] = true
                     }
                 } else {
-                    val res = SearchApi.searchType(query, currentPage, tab.type)
+                    val res = SearchApi.searchType(query, page, tab.type)
                     if (res != null) {
                         val arr = if (tab == SearchTab.LIVE) {
                             if (res.isJsonObject) res.asJsonObject.get("live_room")?.asJsonArray
@@ -97,19 +97,20 @@ class SearchViewModel : ViewModel() {
                                 SearchTab.ARTICLE -> SearchApi.getArticlesFromSearchResult(jsonArray)
                                 else -> emptyList<Any>()
                             }
-                            if (items.isEmpty()) isEnd = true
-                            _results.value = _results.value + items
+                            if (items.isEmpty()) isEnds[tab] = true
+                            val currentList = _results.value[tab] ?: emptyList()
+                            _results.value = _results.value.toMutableMap().apply { put(tab, currentList + items) }
                         } else {
-                            isEnd = true
+                            isEnds[tab] = true
                         }
                     } else {
-                        isEnd = true
+                        isEnds[tab] = true
                     }
                 }
             } catch (e: Exception) {
-                _errorMessage.value = e.message ?: "Unknown error"
+                _errorMessage.value = _errorMessage.value.toMutableMap().apply { put(tab, e.message ?: "Unknown error") }
             } finally {
-                _isLoading.value = false
+                _isLoading.value = _isLoading.value.toMutableMap().apply { put(tab, false) }
             }
         }
     }

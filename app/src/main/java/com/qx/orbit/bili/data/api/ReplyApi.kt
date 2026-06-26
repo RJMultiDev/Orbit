@@ -63,7 +63,8 @@ object ReplyApi {
         @SerializedName("replies") val replies: List<ReplyRootData>? = null,
         @SerializedName("rcount") val rcount: Int = 0,
         @SerializedName("up_action") val up_action: UpActionData? = null,
-        @SerializedName("reply_replies") val reply_replies: List<ReplyRootData>? = null
+        @SerializedName("reply_replies") val reply_replies: List<ReplyRootData>? = null,
+        @SerializedName("action") val action: Int = 0
     )
 
     internal data class MemberData(
@@ -97,7 +98,21 @@ object ReplyApi {
 
     internal data class ContentData(
         @SerializedName("message") val message: String? = null,
-        @SerializedName("pictures") val pictures: List<PictureData>? = null
+        @SerializedName("pictures") val pictures: List<PictureData>? = null,
+        @SerializedName("emote") val emote: Map<String, EmoteData>? = null
+    )
+
+    internal data class EmoteData(
+        @SerializedName("id") val id: Int = 0,
+        @SerializedName("package_id") val packageId: Int = 0,
+        @SerializedName("text") val text: String? = null,
+        @SerializedName("url") val url: String? = null,
+        @SerializedName("meta") val meta: EmoteMetaData? = null
+    )
+
+    internal data class EmoteMetaData(
+        @SerializedName("size") val size: Int = 1,
+        @SerializedName("alias") val alias: String? = null
     )
 
     internal data class PictureData(
@@ -207,6 +222,7 @@ object ReplyApi {
         val body = FormBody.Builder()
             .add("oid", oid.toString())
             .add("rpid", rpid.toString())
+            .add("type", "1")
             .add("action", action.toString())
             .add("csrf", CookieManager.getCsrf())
             .build()
@@ -283,11 +299,21 @@ object ReplyApi {
             likeCount = data.like,
             upLiked = data.up_action?.like ?: false,
             upReplied = data.up_action?.reply ?: false,
-            liked = false,
+            liked = data.action == 1,
             childCount = data.rcount,
             isDynamic = isDynamic,
             childMsgList = childList,
-            isTop = data.reply_control?.is_top ?: false
+            isTop = data.reply_control?.is_top ?: false,
+            emotes = data.content?.emote?.mapValues { 
+                Emote(
+                    id = it.value.id,
+                    packageId = it.value.packageId,
+                    name = it.key,
+                    alias = it.value.meta?.alias ?: "",
+                    url = it.value.url ?: "",
+                    size = it.value.meta?.size ?: 1
+                ) 
+            } ?: emptyMap()
         )
     }
 

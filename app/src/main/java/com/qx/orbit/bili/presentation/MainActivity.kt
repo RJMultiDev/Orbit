@@ -31,6 +31,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,6 +52,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -61,6 +67,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
@@ -73,6 +80,7 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
+import com.qx.orbit.bili.presentation.component.WysTimeText
 import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
@@ -84,6 +92,7 @@ import androidx.wear.compose.material3.ButtonDefaults
 import coil.compose.AsyncImage
 import com.google.gson.Gson
 import com.qx.orbit.bili.data.model.PlayerData
+import com.qx.orbit.bili.data.model.Reply
 import com.qx.orbit.bili.data.model.VideoCard
 import com.qx.orbit.bili.data.remote.CookieManager
 import com.qx.orbit.bili.presentation.player.PlayerScreen
@@ -101,6 +110,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CookieManager.init(this)
+        com.qx.orbit.bili.util.SharedPreferencesUtil.init(this)
         setContent {
             WearApp()
         }
@@ -111,11 +121,15 @@ class MainActivity : ComponentActivity() {
 fun WearApp(viewModel: MainViewModel = viewModel()) {
     OrbitTheme {
         val navController = rememberSwipeDismissableNavController()
+        val currentBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = currentBackStackEntry?.destination?.route
+        val isSwipeEnabled = currentRoute?.startsWith("player/") != true
         
-        AppScaffold {
+        AppScaffold(timeText = { WysTimeText() }) {
             SwipeDismissableNavHost(
                 navController = navController,
                 startDestination = "home",
+                userSwipeEnabled = isSwipeEnabled,
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
             ) {
             composable("home") {
@@ -140,6 +154,20 @@ fun WearApp(viewModel: MainViewModel = viewModel()) {
                     val searchViewModel: SearchViewModel = viewModel()
                     SearchResultScreen(viewModel = searchViewModel, query = query, navController = navController)
                 }
+                composable(
+                    "reply_detail/{replyJson}",
+                    arguments = listOf(
+                        navArgument("replyJson") { type = NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val json = backStackEntry.arguments?.getString("replyJson") ?: ""
+                    val decodedJson = URLDecoder.decode(json, StandardCharsets.UTF_8.toString())
+                    val reply = Gson().fromJson(decodedJson, Reply::class.java)
+                    val replyDetailViewModel: com.qx.orbit.bili.presentation.viewmodel.ReplyDetailViewModel = viewModel()
+                    if (reply != null) {
+                        ReplyDetailScreen(reply = reply, viewModel = replyDetailViewModel, navController = navController)
+                    }
+                }
                 composable("login") {
                     LoginScreen(
                         navController = navController,
@@ -159,6 +187,25 @@ fun WearApp(viewModel: MainViewModel = viewModel()) {
                 val decodedJson = URLDecoder.decode(json, StandardCharsets.UTF_8.toString())
                 val playerData = Gson().fromJson(decodedJson, PlayerData::class.java) ?: PlayerData(aid = 0L)
                 PlayerScreen(initialData = playerData, onBack = { navController.popBackStack() })
+            }
+            composable(
+                "user_space/{mid}",
+                arguments = listOf(
+                    navArgument("mid") { type = NavType.LongType }
+                )
+            ) { backStackEntry ->
+                val mid = backStackEntry.arguments?.getLong("mid") ?: 0L
+                val userSpaceViewModel: com.qx.orbit.bili.presentation.viewmodel.UserSpaceViewModel = viewModel()
+                UserSpaceScreen(mid = mid, viewModel = userSpaceViewModel, navController = navController)
+            }
+            composable("settings_main") {
+                com.qx.orbit.bili.presentation.settings.SettingsScreen(navController = navController)
+            }
+            composable("settings_terminal_player") {
+                com.qx.orbit.bili.presentation.settings.SettingTerminalPlayerScreen(navController = navController)
+            }
+            composable("settings_ui") {
+                com.qx.orbit.bili.presentation.settings.SettingUIScreen(navController = navController)
             }
         }
     }
@@ -211,6 +258,9 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
 
                     LaunchedEffect(showTabMenu) {
                         if (showTabMenu) {
+                            if (navInfo == null || !navInfo!!.isLogin) {
+                                viewModel.fetchNavInfo()
+                            }
                             try { menuFocusRequester.requestFocus() } catch (_: Exception) {}
                         }
                     }
@@ -226,72 +276,155 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
                             modifier = Modifier.fillMaxSize()
                         ) {
                             item {
-                                ListHeader(
-                                    modifier = Modifier.fillMaxWidth().clickable { showTabMenu = false }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .transformedHeight(this, menuTransformationSpec)
+                                        .graphicsLayer {
+                                            with(menuTransformationSpec) {
+                                                applyContainerTransformation(scrollProgress)
+                                            }
+                                        }
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.width(1.dp))
-                                        Text(text = "菜单", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                    ListHeader(
+                                        modifier = Modifier.fillMaxWidth().clickable { showTabMenu = false }
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Menu", tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(modifier = Modifier.width(1.dp))
+                                            Text(text = "菜单", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
                             item {
-                                if (navInfo != null && navInfo!!.isLogin) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(CircleShape)
-                                            .height(48.dp)
-                                            .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        AsyncImage(
-                                            model = navInfo!!.face,
-                                            contentDescription = "Avatar",
-                                            modifier = Modifier.size(36.dp).clip(CircleShape)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(navInfo!!.uname ?: "", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .transformedHeight(this, menuTransformationSpec)
+                                        .graphicsLayer {
+                                            with(menuTransformationSpec) {
+                                                applyContainerTransformation(scrollProgress)
+                                            }
+                                        }
+                                ) {
+                                    if (navInfo != null && navInfo!!.isLogin) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(CircleShape)
+                                                .height(48.dp)
+                                                .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium)
+                                                .clickable {
+                                                    showTabMenu = false
+                                                    navController.navigate("user_space/${navInfo!!.mid}")
+                                                },
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            AsyncImage(
+                                                model = navInfo!!.face,
+                                                contentDescription = "Avatar",
+                                                modifier = Modifier.size(36.dp).clip(CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(navInfo!!.uname ?: "", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = {
+                                                showTabMenu = false
+                                                navController.navigate("login")
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                        ) {
+                                            Icon(imageVector = Icons.Default.AccountCircle, contentDescription = "登录")
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("登录")
+                                        }
                                     }
-                                } else {
+                                }
+                            }
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .transformedHeight(this, menuTransformationSpec)
+                                        .graphicsLayer {
+                                            with(menuTransformationSpec) {
+                                                applyContainerTransformation(scrollProgress)
+                                            }
+                                        }
+                                ) {
                                     Button(
                                         onClick = {
                                             showTabMenu = false
-                                            navController.navigate("login")
+                                            navController.navigate("search")
                                         },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("登录")
+                                        Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("搜索")
                                     }
-                                }
-                            }
-                            item {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Button(
-                                    onClick = {
-                                        showTabMenu = false
-                                        navController.navigate("search")
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("搜索")
                                 }
                             }
                             items(TabMode.entries.size) { index ->
                                 val tab = TabMode.entries[index]
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Button(
-                                    onClick = {
-                                        viewModel.switchTab(tab)
-                                        showTabMenu = false
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .transformedHeight(this, menuTransformationSpec)
+                                        .graphicsLayer {
+                                            with(menuTransformationSpec) {
+                                                applyContainerTransformation(scrollProgress)
+                                            }
+                                        }
                                 ) {
-                                    Text(tab.title)
+                                    Button(
+                                        onClick = {
+                                            viewModel.switchTab(tab)
+                                            showTabMenu = false
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        if (tab == TabMode.RECOMMEND) {
+                                            Icon(imageVector = Icons.Default.Star, contentDescription = tab.title)
+                                        } else {
+                                            Icon(imageVector = Icons.Default.ThumbUp, contentDescription = tab.title)
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(tab.title)
+                                    }
                                 }
+                            }
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .transformedHeight(this, menuTransformationSpec)
+                                        .graphicsLayer {
+                                            with(menuTransformationSpec) {
+                                                applyContainerTransformation(scrollProgress)
+                                            }
+                                        }
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            showTabMenu = false
+                                            navController.navigate("settings_main")
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Settings, contentDescription = "设置")
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("设置")
+                                    }
+                                }
+                            }
+                            item {
+                                Spacer(modifier = Modifier.height(32.dp))
                             }
                         }
                     }
