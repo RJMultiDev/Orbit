@@ -74,8 +74,10 @@ class SearchViewModel : ViewModel() {
                     if (res != null) {
                         val items = SearchApi.getVideosFromSearchResult(res, page == 1)
                         if (items.isEmpty()) isEnds[tab] = true
+                        
+                        val filteredItems = items.filter { it.bvid.isNotEmpty() || it.aid > 0 }
                         val currentList = _results.value[tab] ?: emptyList()
-                        _results.value = _results.value.toMutableMap().apply { put(tab, currentList + items) }
+                        _results.value = _results.value.toMutableMap().apply { put(tab, currentList + filteredItems) }
                     } else {
                         isEnds[tab] = true
                     }

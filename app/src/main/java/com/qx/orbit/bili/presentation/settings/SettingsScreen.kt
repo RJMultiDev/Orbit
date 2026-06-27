@@ -26,7 +26,7 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.wear.compose.material3.lazy.transformedHeight
+import com.qx.orbit.bili.data.remote.CookieManager
 import com.qx.orbit.bili.util.SharedPreferencesUtil
 
 @Composable
@@ -219,6 +219,42 @@ fun SettingTerminalPlayerScreen(navController: NavController) {
                 ) {
                     val label = if (maxLines == 0) "不限" else "${maxLines}行"
                     Text(text = "弹幕密度: $label", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+
+            item {
+                val isLoggedIn = CookieManager.getCookie().contains("SESSDATA")
+                val qualityOptions = listOf(
+                    16 to "360p",
+                    32 to "480p",
+                    64 to "720p",
+                    80 to "1080p"
+                )
+                var currentQn by remember { mutableStateOf(SharedPreferencesUtil.getInt("play_qn", 16)) }
+                val currentIndex = qualityOptions.indexOfFirst { it.first == currentQn }.coerceAtLeast(0)
+
+                Button(
+                    onClick = {
+                        val nextIndex = (currentIndex + 1) % qualityOptions.size
+                        val nextQn = qualityOptions[nextIndex].first
+                        if (nextQn >= 64 && !isLoggedIn) {
+                            return@Button
+                        }
+                        currentQn = nextQn
+                        SharedPreferencesUtil.putInt("play_qn", nextQn)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .transformedHeight(this, transformationSpec)
+                        .graphicsLayer {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                ) {
+                    val label = qualityOptions[currentIndex].second
+                    val lockIcon = if (currentQn >= 64 && !isLoggedIn) " 🔒" else ""
+                    Text(text = "视频清晰度: $label$lockIcon", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

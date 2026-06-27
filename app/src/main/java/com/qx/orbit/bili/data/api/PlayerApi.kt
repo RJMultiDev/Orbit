@@ -123,7 +123,7 @@ object PlayerApi {
     )
 
     suspend fun getVideoDash(playerData: PlayerData): PlayerData = withContext(Dispatchers.IO) {
-        val baseUrl = "https://api.bilibili.com/x/player/wbi/playurl?avid=${playerData.aid}&cid=${playerData.cid}&qn=${playerData.qn}&fnval=16&fourk=1&fnver=0&platform=pc&voice_balance=1"
+        val baseUrl = "https://api.bilibili.com/x/player/wbi/playurl?avid=${playerData.aid}&cid=${playerData.cid}&qn=${playerData.qn}&fnval=16&fourk=1&fnver=0&platform=pc&voice_balance=1&gaia_source=pre-load&isGaiaAvoided=true"
         val url = ConfInfoApi.signWBI(baseUrl)
         val json = httpGet(url)
         val type = object : TypeToken<ApiResponse<PlayUrlData>>() {}.type
@@ -181,10 +181,12 @@ object PlayerApi {
                 dolbyAudio = dolbyAudio,
                 flacAudio = flacAudio
             )
+            val selectedVideo = dashData.getVideoStream(playerData.qn)
+            val selectedAudio = dashData.getBestAudioStream()
             playerData.copy(
                 dashData = dashData,
-                videoUrl = videoStreams.firstOrNull()?.baseUrl ?: "",
-                audioUrl = audioStreams.firstOrNull()?.baseUrl ?: "",
+                videoUrl = selectedVideo?.baseUrl ?: videoStreams.firstOrNull()?.baseUrl ?: "",
+                audioUrl = selectedAudio?.baseUrl ?: audioStreams.firstOrNull()?.baseUrl ?: "",
                 progress = data.quality,
                 qnStrList = data.accept_description?.toTypedArray(),
                 qnValueList = data.accept_quality?.toIntArray()
@@ -195,7 +197,7 @@ object PlayerApi {
     }
 
     suspend fun getVideo(playerData: PlayerData): PlayerData = withContext(Dispatchers.IO) {
-        val baseUrl = "https://api.bilibili.com/x/player/wbi/playurl?avid=${playerData.aid}&cid=${playerData.cid}&qn=${playerData.qn}&fnval=1&fnver=0&platform=pc&voice_balance=1"
+        val baseUrl = "https://api.bilibili.com/x/player/wbi/playurl?avid=${playerData.aid}&cid=${playerData.cid}&qn=${playerData.qn}&high_quality=1&fnval=1&fnver=0&platform=html5&voice_balance=1&gaia_source=pre-load&isGaiaAvoided=true"
         val url = ConfInfoApi.signWBI(baseUrl)
         val json = httpGet(url)
         val type = object : TypeToken<ApiResponse<PlayUrlData>>() {}.type

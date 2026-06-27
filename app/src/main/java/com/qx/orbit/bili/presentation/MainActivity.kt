@@ -161,8 +161,7 @@ fun WearApp(viewModel: MainViewModel = viewModel()) {
                     )
                 ) { backStackEntry ->
                     val json = backStackEntry.arguments?.getString("replyJson") ?: ""
-                    val decodedJson = URLDecoder.decode(json, StandardCharsets.UTF_8.toString())
-                    val reply = Gson().fromJson(decodedJson, Reply::class.java)
+                    val reply = Gson().fromJson(json, Reply::class.java)
                     val replyDetailViewModel: com.qx.orbit.bili.presentation.viewmodel.ReplyDetailViewModel = viewModel()
                     if (reply != null) {
                         ReplyDetailScreen(reply = reply, viewModel = replyDetailViewModel, navController = navController)
@@ -184,8 +183,7 @@ fun WearApp(viewModel: MainViewModel = viewModel()) {
                 )
             ) { backStackEntry ->
                 val json = backStackEntry.arguments?.getString("playerDataJson") ?: ""
-                val decodedJson = URLDecoder.decode(json, StandardCharsets.UTF_8.toString())
-                val playerData = Gson().fromJson(decodedJson, PlayerData::class.java) ?: PlayerData(aid = 0L)
+                val playerData = Gson().fromJson(json, PlayerData::class.java) ?: PlayerData(aid = 0L)
                 PlayerScreen(initialData = playerData, onBack = { navController.popBackStack() })
             }
             composable(

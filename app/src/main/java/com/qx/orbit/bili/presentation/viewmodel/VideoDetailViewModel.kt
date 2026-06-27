@@ -27,6 +27,9 @@ class VideoDetailViewModel : ViewModel() {
     private val _replies = MutableStateFlow<List<Reply>>(emptyList())
     val replies: StateFlow<List<Reply>> = _replies.asStateFlow()
 
+    private val _replyCount = MutableStateFlow(0)
+    val replyCount: StateFlow<Int> = _replyCount.asStateFlow()
+
     private val _relatedVideos = MutableStateFlow<List<VideoCard>>(emptyList())
     val relatedVideos: StateFlow<List<VideoCard>> = _relatedVideos.asStateFlow()
 
@@ -84,7 +87,10 @@ class VideoDetailViewModel : ViewModel() {
         viewModelScope.launch {
             _isReplyLoading.value = true
             try {
-                if (reset) replyPage = 1
+                if (reset) {
+                    replyPage = 1
+                    _replyCount.value = ReplyApi.getReplyCount(oid = aid).toInt()
+                }
                 val newReplies = ReplyApi.getReplies(oid = aid, pageNumber = replyPage)
                 if (reset) {
                     _replies.value = newReplies

@@ -36,6 +36,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import com.qx.orbit.bili.data.api.EmoteApi
 import kotlinx.coroutines.delay
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.input.rotary.onPreRotaryScrollEvent
+import kotlin.math.max
 
 @Composable
 fun WriteReplyScreen(
@@ -45,8 +59,9 @@ fun WriteReplyScreen(
     onSend: (String) -> Unit,
     onClose: () -> Unit
 ) {
-    var text by remember { mutableStateOf("") }
+    var text by remember { mutableStateOf(TextFieldValue("")) }
     var isSending by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     Dialog(
         visible = visible,
@@ -109,9 +124,8 @@ fun WriteReplyScreen(
                     }
 
                     item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        ReplyInputLayout(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
                             OutlinedTextField(
                                 value = text,
@@ -122,8 +136,9 @@ fun WriteReplyScreen(
                                         color = MaterialTheme.colorScheme.outline
                                     )
                                 },
-                                singleLine = true,
-                                shape = RoundedCornerShape(50.dp),
+                                singleLine = false,
+                                maxLines = 5,
+                                shape = RoundedCornerShape(24.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -132,14 +147,68 @@ fun WriteReplyScreen(
                                     focusedBorderColor = MaterialTheme.colorScheme.background,
                                     unfocusedBorderColor = MaterialTheme.colorScheme.background
                                 ),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.onPreRotaryScrollEvent {
+                                    focusManager.clearFocus()
+                                    false
+                                },
+                                visualTransformation = { annotatedString ->
+                                    val expandedText = buildString {
+                                        for (char in annotatedString.text) {
+                                            val emoteName = EmoteMapper.getNameForChar(char)
+                                            if (emoteName != null) {
+                                                append(emoteName)
+                                            } else {
+                                                append(char)
+                                            }
+                                        }
+                                    }
+
+                                    val flatEmotes = emotes?.flatMap { it.emotes }?.associateBy { it.name } ?: emptyMap()
+                                    val richText = parseRichTextForInput(expandedText, flatEmotes)
+
+                                    val offsetMapping = object : OffsetMapping {
+                                        override fun originalToTransformed(offset: Int): Int {
+                                            var visualOffset = 0
+                                            for (i in 0 until offset.coerceAtMost(annotatedString.text.length)) {
+                                                val char = annotatedString.text[i]
+                                                val emoteName = EmoteMapper.getNameForChar(char)
+                                                if (emoteName != null) {
+                                                    visualOffset += emoteName.length
+                                                } else {
+                                                    visualOffset += 1
+                                                }
+                                            }
+                                            return visualOffset
+                                        }
+
+                                        override fun transformedToOriginal(offset: Int): Int {
+                                            var visualOffset = 0
+                                            var originalOffset = 0
+                                            val textLen = annotatedString.text.length
+                                            while (originalOffset < textLen) {
+                                                if (visualOffset >= offset) break
+                                                val char = annotatedString.text[originalOffset]
+                                                val emoteName = EmoteMapper.getNameForChar(char)
+                                                val len = emoteName?.length ?: 1
+                                                if (visualOffset + len > offset) {
+                                                    return if (offset - visualOffset > len / 2) originalOffset + 1 else originalOffset
+                                                }
+                                                visualOffset += len
+                                                originalOffset++
+                                            }
+                                            return originalOffset
+                                        }
+                                    }
+
+                                    TransformedText(richText, offsetMapping)
+                                }
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
                             Button(
                                 onClick = {
-                                    if (text.isNotEmpty()) {
+                                    if (text.text.isNotEmpty()) {
                                         isSending = true
-                                        onSend(text)
+                                        onSend(EmoteMapper.decode(text.text))
+                                        text = TextFieldValue("")
                                     }
                                 },
                                 modifier = Modifier.size(48.dp),
@@ -221,7 +290,14 @@ fun WriteReplyScreen(
                                                                 modifier = Modifier
                                                                     .height(40.dp)
                                                                     .clip(RoundedCornerShape(4.dp))
-                                                                    .clickable { text += emote.name }
+                                                                    .clickable {
+                                                                        val char = EmoteMapper.getCharForName(emote.name).toString()
+                                                                        val currentText = text.text
+                                                                        val selection = text.selection
+                                                                        val newText = currentText.substring(0, selection.min) + char + currentText.substring(selection.max)
+                                                                        val newCursor = selection.min + char.length
+                                                                        text = TextFieldValue(newText, TextRange(newCursor))
+                                                                    }
                                                                     .padding(4.dp),
                                                                 textAlign = TextAlign.Center
                                                             )
@@ -233,7 +309,14 @@ fun WriteReplyScreen(
                                                                 modifier = Modifier
                                                                     .size(40.dp)
                                                                     .clip(RoundedCornerShape(4.dp))
-                                                                    .clickable { text += emote.name }
+                                                                    .clickable {
+                                                                        val char = EmoteMapper.getCharForName(emote.name).toString()
+                                                                        val currentText = text.text
+                                                                        val selection = text.selection
+                                                                        val newText = currentText.substring(0, selection.min) + char + currentText.substring(selection.max)
+                                                                        val newCursor = selection.min + char.length
+                                                                        text = TextFieldValue(newText, TextRange(newCursor))
+                                                                    }
                                                                     .padding(4.dp)
                                                             )
                                                         }
@@ -262,6 +345,132 @@ fun WriteReplyScreen(
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 8.dp)
                     )
+                }
+            }
+        }
+    }
+}
+
+object EmoteMapper {
+    private val nameToChar = mutableMapOf<String, Char>()
+    private val charToName = mutableMapOf<Char, String>()
+    private var nextChar = '\uE000'
+
+    fun getCharForName(name: String): Char {
+        return nameToChar.getOrPut(name) {
+            val c = nextChar++
+            charToName[c] = name
+            c
+        }
+    }
+
+    fun getNameForChar(c: Char): String? = charToName[c]
+
+    fun decode(text: String): String {
+        val sb = java.lang.StringBuilder()
+        for (c in text) {
+            val name = charToName[c]
+            if (name != null) {
+                sb.append(name)
+            } else {
+                sb.append(c)
+            }
+        }
+        return sb.toString()
+    }
+}
+
+@Composable
+fun ReplyInputLayout(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Layout(
+        content = content,
+        modifier = modifier
+    ) { measurables, constraints ->
+        val tfMeasurable = measurables[0]
+        val btnMeasurable = measurables[1]
+
+        val btnPlaceable = btnMeasurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+        val spacing = 8.dp.roundToPx()
+
+        val maxRowWidth = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
+        val rowTfWidth = max(0, maxRowWidth - btnPlaceable.width - spacing)
+
+        val tfHeightAtRowWidth = tfMeasurable.maxIntrinsicHeight(rowTfWidth)
+        val singleLineHeightThreshold = 68.dp.roundToPx()
+
+        if (tfHeightAtRowWidth > singleLineHeightThreshold) {
+            val tfPlaceable = tfMeasurable.measure(constraints.copy(minWidth = 0))
+            val layoutWidth = constraints.maxWidth
+            val layoutHeight = tfPlaceable.height + spacing + btnPlaceable.height
+
+            layout(layoutWidth, layoutHeight) {
+                tfPlaceable.placeRelative(0, 0)
+                btnPlaceable.placeRelative(layoutWidth - btnPlaceable.width, tfPlaceable.height + spacing)
+            }
+        } else {
+            val tfPlaceable = tfMeasurable.measure(constraints.copy(minWidth = 0, maxWidth = rowTfWidth))
+            val layoutWidth = constraints.maxWidth
+            val layoutHeight = max(tfPlaceable.height, btnPlaceable.height)
+
+            layout(layoutWidth, layoutHeight) {
+                tfPlaceable.placeRelative(0, (layoutHeight - tfPlaceable.height) / 2)
+                btnPlaceable.placeRelative(layoutWidth - btnPlaceable.width, (layoutHeight - btnPlaceable.height) / 2)
+            }
+        }
+    }
+}
+
+fun parseRichTextForInput(
+    text: String,
+    emotes: Map<String, EmoteApi.Emote>
+): androidx.compose.ui.text.AnnotatedString {
+    val processedText = text
+    val urlPattern = "(https?://[^\\s<>()\\[\\]\"',;!?]+|www\\.[^\\s<>()\\[\\]\"',;!?]+)"
+    val videoPattern = "(?i)(bv[A-Za-z0-9]+|av\\d+)"
+    val fullPattern = Regex("($urlPattern|$videoPattern)")
+    
+    return androidx.compose.ui.text.buildAnnotatedString {
+        if (emotes.isEmpty() && !processedText.contains(fullPattern)) {
+            append(processedText)
+            return@buildAnnotatedString
+        }
+        
+        val parts = processedText.split(fullPattern)
+        val matches = fullPattern.findAll(processedText).toList()
+        
+        for (i in parts.indices) {
+            val part = parts[i]
+            if (part.isNotEmpty()) {
+                if (emotes.isNotEmpty()) {
+                    val emotePattern = "\\[[^]]+]".toRegex()
+                    var lastIdx = 0
+                    for (emoteMatch in emotePattern.findAll(part)) {
+                        val emoteKey = emoteMatch.value
+                        val emote = emotes[emoteKey]
+                        if (emote != null) {
+                            append(part.substring(lastIdx, emoteMatch.range.first))
+                            withStyle(SpanStyle(color = Color(0xFF00A0D8))) {
+                                append(emoteKey)
+                            }
+                        } else {
+                            append(part.substring(lastIdx, emoteMatch.range.first))
+                            append(emoteKey)
+                        }
+                        lastIdx = emoteMatch.range.last + 1
+                    }
+                    append(part.substring(lastIdx))
+                } else {
+                    append(part)
+                }
+            }
+            
+            if (i < matches.size) {
+                val match = matches[i].value
+                withStyle(SpanStyle(color = Color(0xFF00A0D8))) {
+                    append(match)
                 }
             }
         }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,8 +20,10 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -93,7 +96,13 @@ fun RecommendVideoCard(
                             text = parseHighlightedTitle(item.title),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                shadow = Shadow(
+                                    color = Color.Black,
+                                    offset = Offset(2f, 2f),
+                                    blurRadius = 4f
+                                )
+                            ),
                             color = Color.White
                         )
                     } else {
@@ -101,7 +110,13 @@ fun RecommendVideoCard(
                             text = item.title,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = Color.Black,
+                                    offset = Offset(2f, 2f),
+                                    blurRadius = 4f
+                                )
+                            ),
                             color = Color.White
                         )
                     }
@@ -117,22 +132,44 @@ fun RecommendVideoCard(
                         text = item.upName,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black,
+                                offset = Offset(2f, 2f),
+                                blurRadius = 4f
+                            )
+                        ),
                         color = Color.White.copy(alpha = 0.8f),
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Views",
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp)
-                        )
+                        Box {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = Color.Black.copy(alpha = 0.8f),
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .offset(x = 1.dp, y = 1.dp)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Views",
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(2.dp))
                         Text(
                             text = item.view,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = Color.Black,
+                                    offset = Offset(2f, 2f),
+                                    blurRadius = 4f
+                                )
+                            ),
                             color = Color.White,
                             fontSize = 10.sp
                         )

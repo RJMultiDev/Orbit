@@ -149,10 +149,14 @@ object ReplyApi {
         val resp: ApiResponse<ReplyListData>? = GsonConfig.gson.fromJson(json, typeToken)
         if (resp == null || !resp.isSuccess || resp.data == null) return@withContext emptyList()
         val isDynamic = type == REPLY_TYPE_DYNAMIC || type == REPLY_TYPE_DYNAMIC_CHILD
-        val topList = resp.data.top_replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid) } ?: emptyList()
         val normalList = resp.data.replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid) } ?: emptyList()
-        val topIds = topList.map { it.rpid }.toSet()
-        topList + normalList.filter { it.rpid !in topIds }
+        if (pageNumber == 1) {
+            val topList = resp.data.top_replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid) } ?: emptyList()
+            val topIds = topList.map { it.rpid }.toSet()
+            topList + normalList.filter { it.rpid !in topIds }
+        } else {
+            normalList
+        }
     }
 
     suspend fun getRepliesLazy(

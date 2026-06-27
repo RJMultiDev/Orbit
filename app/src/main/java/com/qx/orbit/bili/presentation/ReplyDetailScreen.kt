@@ -60,6 +60,7 @@ fun ReplyDetailScreen(
                         reply = root,
                         transformation = SurfaceTransformation(transformationSpec),
                         modifier = Modifier.transformedHeight(this, transformationSpec),
+                        navController = navController,
                         onLikeClick = { viewModel.likeRootReply(root.liked) },
                         onReplyClick = {}
                     )
@@ -87,6 +88,7 @@ fun ReplyDetailScreen(
                         reply = childReplies[index],
                         transformation = SurfaceTransformation(transformationSpec),
                         modifier = Modifier.transformedHeight(this, transformationSpec),
+                        navController = navController,
                         onLikeClick = { viewModel.likeChildReply(childReplies[index].rpid, childReplies[index].liked) },
                         onReplyClick = {}
                     )

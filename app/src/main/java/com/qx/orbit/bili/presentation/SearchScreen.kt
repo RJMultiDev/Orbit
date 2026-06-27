@@ -15,6 +15,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import kotlinx.coroutines.Job
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.fadeIn
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.itemsIndexed
+import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
@@ -70,97 +74,172 @@ import com.qx.orbit.bili.presentation.viewmodel.SearchTab
 import com.qx.orbit.bili.presentation.viewmodel.SearchViewModel
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import androidx.wear.compose.material3.SwipeToReveal
+import androidx.wear.compose.material3.SwipeToRevealDefaults
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
+import com.qx.orbit.bili.util.SharedPreferencesUtil
+import com.qx.orbit.bili.data.api.BilibiliIDConverter
+import com.qx.orbit.bili.util.formatCount
+import kotlinx.coroutines.launch
+
+object SearchHistoryManager {
+    private const val KEY = "search_history"
+    fun getHistory(): List<String> {
+        val str = SharedPreferencesUtil.getString(KEY, "")
+        return if (str.isEmpty()) emptyList() else str.split("||")
+    }
+    fun addHistory(query: String) {
+        val list = getHistory().toMutableList()
+        list.remove(query)
+        list.add(0, query)
+        if (list.size > 20) list.removeAt(list.lastIndex)
+        SharedPreferencesUtil.putString(KEY, list.joinToString("||"))
+    }
+    fun removeHistory(query: String) {
+        val list = getHistory().toMutableList()
+        list.remove(query)
+        SharedPreferencesUtil.putString(KEY, list.joinToString("||"))
+    }
+}
 
 @Composable
 fun SearchInputScreen(navController: NavHostController) {
     var searchText by remember { mutableStateOf("") }
+    var historyList by remember { mutableStateOf(SearchHistoryManager.getHistory()) }
     val focusRequester = remember { FocusRequester() }
+    val listState = rememberTransformingLazyColumnState()
+    val transformationSpec = rememberTransformationSpec()
+    val isRound = androidx.compose.ui.platform.LocalConfiguration.current.isScreenRound
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
 
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val spokenText: String? =
-                result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.get(0)
-            if (!spokenText.isNullOrEmpty()) {
-                searchText = spokenText
-                val encodedQuery = URLEncoder.encode(searchText, StandardCharsets.UTF_8.toString())
+    val performSearch = { query: String ->
+        val trimmed = query.trim()
+        if (trimmed.isNotBlank()) {
+            SearchHistoryManager.addHistory(trimmed)
+            historyList = SearchHistoryManager.getHistory()
+            if (trimmed.matches(Regex("(?i)^(av\\d+|bv[0-9a-zA-Z]{10})$"))) {
+                val isBv = trimmed.lowercase().startsWith("bv")
+                val bvid = if (isBv) trimmed else BilibiliIDConverter.aidToBv(trimmed.lowercase().removePrefix("av").toLong())
+                val aid = if (!isBv) trimmed.lowercase().removePrefix("av").toLong() else BilibiliIDConverter.bvToAid(trimmed)
+                navController.navigate("detail/$bvid/$aid")
+            } else {
+                val encodedQuery = URLEncoder.encode(trimmed, StandardCharsets.UTF_8.toString())
                 navController.navigate("search_result/$encodedQuery")
             }
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .focusRequester(focusRequester),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+    ScreenScaffold(
+        timeText = { WysTimeText() },
+        scrollState = listState,
+        modifier = Modifier.fillMaxSize().focusRequester(focusRequester)
+    ) { contentPadding ->
+        TransformingLazyColumn(
+            state = listState,
+            contentPadding = contentPadding,
+            modifier = Modifier.fillMaxSize()
         ) {
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                placeholder = {
-                    Material3Text(
-                        "输入搜索词",
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(50.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedBorderColor = MaterialTheme.colorScheme.background,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.background
-                ),
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            FilledIconButton(
-                onClick = {
-                    if (searchText.isNotBlank()) {
-                        val encodedQuery = URLEncoder.encode(searchText, StandardCharsets.UTF_8.toString())
-                        navController.navigate("search_result/$encodedQuery")
-                    }
-                },
-                modifier = Modifier.size(IconButtonDefaults.DefaultButtonSize),
-                enabled = searchText.isNotBlank(),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "搜索"
-                )
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
             }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Optional: Voice Search Button
-        Button(
-            onClick = {
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec)
+                        .graphicsLayer { if (isRound) { with(transformationSpec) { applyContainerTransformation(scrollProgress) } } },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchText,
+                        onValueChange = { searchText = it },
+                        placeholder = {
+                            Material3Text("搜你所想", color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(50.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = MaterialTheme.colorScheme.background,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.background
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { performSearch(searchText) }),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    FilledIconButton(
+                        onClick = { performSearch(searchText) },
+                        modifier = Modifier.size(IconButtonDefaults.DefaultButtonSize),
+                        enabled = searchText.isNotBlank(),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
+                    }
                 }
-                launcher.launch(intent)
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("语音搜索", color = MaterialTheme.colorScheme.onSurface)
+            }
+            
+            if (historyList.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "搜索历史",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .transformedHeight(this, transformationSpec)
+                            .graphicsLayer { if (isRound) { with(transformationSpec) { applyContainerTransformation(scrollProgress) } } }
+                    )
+                }
+                items(historyList, key = { it }) { history ->
+                    SwipeToReveal(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateItem()
+                            .transformedHeight(this@items, transformationSpec)
+                            .graphicsLayer { if (isRound) { with(transformationSpec) { applyContainerTransformation(scrollProgress) } } },
+                        primaryAction = {
+                            PrimaryActionButton(
+                                onClick = {
+                                    SearchHistoryManager.removeHistory(history)
+                                    historyList = SearchHistoryManager.getHistory()
+                                },
+                                icon = {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "删除")
+                                },
+                                text = { Text("删除") },
+                                modifier = Modifier.height(SwipeToRevealDefaults.LargeActionButtonHeight)
+                            )
+                        },
+                        onSwipePrimaryAction = {
+                            SearchHistoryManager.removeHistory(history)
+                            historyList = SearchHistoryManager.getHistory()
+                        }
+                    ) {
+                        Button(
+                            onClick = { performSearch(history) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                        ) {
+                            Text(text = history, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -183,8 +262,8 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
         viewModel.performSearch(query)
     }
 
-    LaunchedEffect(pagerState.currentPage) {
-        val tab = SearchTab.entries[pagerState.currentPage]
+    LaunchedEffect(pagerState.settledPage) {
+        val tab = SearchTab.entries[pagerState.settledPage]
         viewModel.switchTab(tab)
     }
 
@@ -204,13 +283,39 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
     }
 
     var actualTitleHeightPx by remember { mutableFloatStateOf(0f) }
-    var titleOffset by remember { mutableFloatStateOf(0f) }
+    val titleOffsetAnim = remember { Animatable(0f) }
+    val coroutineScope = rememberCoroutineScope()
+    
+    LaunchedEffect(pagerState) {
+        var animJob: Job? = null
+        snapshotFlow { pagerState.isScrollInProgress to pagerState.currentPage }
+            .collect { (inProgress, _) ->
+                if (inProgress || titleOffsetAnim.value != 0f) {
+                    animJob?.cancel()
+                    animJob = launch {
+                        if (titleOffsetAnim.value != 0f) {
+                            titleOffsetAnim.animateTo(0f, animationSpec = tween(300))
+                        }
+                    }
+                }
+            }
+    }
+
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (pagerState.isScrollInProgress) return Offset.Zero
+                
+                if (titleOffsetAnim.isRunning && titleOffsetAnim.targetValue == 0f) {
+                    return Offset.Zero
+                }
+
                 val delta = available.y
                 if (actualTitleHeightPx > 0f) {
-                    titleOffset = (titleOffset + delta).coerceIn(-actualTitleHeightPx, 0f)
+                    val newVal = (titleOffsetAnim.value + delta).coerceIn(-actualTitleHeightPx, 0f)
+                    coroutineScope.launch {
+                        titleOffsetAnim.snapTo(newVal)
+                    }
                 }
                 return Offset.Zero
             }
@@ -258,12 +363,14 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                         }
 
                         // Reduced gap
-                        Box(modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp).transformedHeight(this@itemsIndexed, transformationSpec)) {
+                        Box(modifier = Modifier.transformedHeight(this@itemsIndexed, transformationSpec)) {
                             when (item) {
                                 is VideoCard -> RecommendVideoCard(
                                     item = item, 
                                     onClick = {
-                                        navController.navigate("detail/${item.bvid}/${item.aid}")
+                                        if (item.bvid.isNotEmpty() || item.aid > 0) {
+                                            navController.navigate("detail/${item.bvid}/${item.aid}")
+                                        }
                                     },
                                     transformation = SurfaceTransformation(transformationSpec)
                                 )
@@ -320,11 +427,11 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset { IntOffset(0, titleOffset.roundToInt()) }
-                .padding(top = 12.dp)
+                .offset { IntOffset(0, titleOffsetAnim.value.roundToInt()) }
+                .padding(top = 22.dp)
                 .zIndex(2f)
                 .onGloballyPositioned { coordinates ->
-                    actualTitleHeightPx = coordinates.size.height.toFloat() + with(localDensity) { 12.dp.toPx() }
+                    actualTitleHeightPx = coordinates.size.height.toFloat() + with(localDensity) { 24.dp.toPx() }
                 }
         ) {
             Box(
@@ -332,7 +439,13 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                     .height(28.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .clickable { showTabMenu = true },
+                    .clickable { 
+                        if (showTabMenu) {
+                            showTabMenu = false
+                        } else {
+                            showTabMenu = true
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Row(
@@ -340,19 +453,35 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val currentDisplayTab = SearchTab.entries.getOrNull(pagerState.currentPage) ?: currentTab
-                    Text(
-                        text = currentDisplayTab.title,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "切换",
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    if (showTabMenu) {
+                        Text(
+                            text = "返回",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(1.dp))
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = "返回",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            text = currentDisplayTab.title,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(1.dp))
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "切换",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -387,6 +516,10 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                         modifier = Modifier.fillMaxSize()
                     ) {
                         item {
+                            Spacer(modifier = Modifier.height(36.dp))
+                        }
+                        
+                        item {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -397,18 +530,57 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                                         }
                                     }
                             ) {
-                                ListHeader(
-                                    modifier = Modifier.fillMaxWidth().clickable { showTabMenu = false }
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Close Menu", tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.width(1.dp))
-                                        Text(text = "收起", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                var innerSearch by remember(query) { mutableStateOf(query) }
+                                val doInnerSearch = {
+                                    val trimmed = innerSearch.trim()
+                                    if (trimmed.isNotBlank() && trimmed != query) {
+                                        SearchHistoryManager.addHistory(trimmed)
+                                        if (trimmed.matches(Regex("(?i)^(av\\d+|bv[0-9a-zA-Z]{10})$"))) {
+                                            val isBv = trimmed.lowercase().startsWith("bv")
+                                            val bvid = if (isBv) trimmed else BilibiliIDConverter.aidToBv(trimmed.lowercase().removePrefix("av").toLong())
+                                            val aid = if (!isBv) trimmed.lowercase().removePrefix("av").toLong() else BilibiliIDConverter.bvToAid(trimmed)
+                                            navController.navigate("detail/$bvid/$aid")
+                                        } else {
+                                            val encodedQuery = java.net.URLEncoder.encode(trimmed, java.nio.charset.StandardCharsets.UTF_8.toString())
+                                            navController.navigate("search_result/$encodedQuery") {
+                                                popUpTo("search") { inclusive = false }
+                                            }
+                                        }
+                                    }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    OutlinedTextField(
+                                        value = innerSearch,
+                                        onValueChange = { innerSearch = it },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(50.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                            focusedBorderColor = MaterialTheme.colorScheme.background,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.background
+                                        ),
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                        keyboardActions = KeyboardActions(onSearch = { doInnerSearch() }),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    FilledIconButton(
+                                        onClick = { doInnerSearch() },
+                                        modifier = Modifier.size(IconButtonDefaults.DefaultButtonSize),
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
                                     }
                                 }
                             }
                         }
-                        
+
                         items(SearchTab.entries.size) { index ->
                             val tab = SearchTab.entries[index]
                             Box(
@@ -425,7 +597,6 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 4.dp)
                                         .clip(CircleShape)
                                         .height(48.dp)
                                         .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer, CircleShape)
@@ -444,6 +615,7 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                                 }
                             }
                         }
+                        item { Spacer(Modifier.height(20.dp)) }
                     }
                 }
             }
@@ -459,79 +631,17 @@ fun LiveRoomCard(
     transformation: SurfaceTransformation? = null
 ) {
     val coverUrl = item.user_cover.ifEmpty { item.cover }.ifEmpty { item.keyframe }
-    val finalCover = if (coverUrl.contains("@")) coverUrl else "${coverUrl}@480w_270h_1c.webp"
-
-    Card(
+    RecommendVideoCard(
+        item = VideoCard(
+            title = item.title,
+            cover = coverUrl,
+            upName = item.uname,
+            view = formatCount(item.online)
+        ),
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(110.dp),
-        shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(0.dp),
+        modifier = modifier,
         transformation = transformation
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = coil.request.ImageRequest.Builder(LocalContext.current)
-                    .data(finalCover)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.8f),
-                            Color.Black.copy(alpha = 0.1f),
-                            Color.Black.copy(alpha = 0.8f)
-                        )
-                    )
-                )
-            )
-            Column(
-                modifier = Modifier.fillMaxSize().padding(12.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    val titleText = if (item.title.contains("<em")) {
-                        parseHighlightedTitle(item.title)
-                    } else {
-                        AnnotatedString(item.title)
-                    }
-                    Text(
-                        text = titleText,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = item.uname,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "🔴 ${item.online}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-        }
-    }
+    )
 }
 
 @Composable
@@ -546,8 +656,8 @@ fun UserInfoCard(
         modifier = modifier.fillMaxWidth(), 
         transformation = transformation,
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f),
-            contentColor = MaterialTheme.colorScheme.primary,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             secondaryContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         icon = {
@@ -556,13 +666,15 @@ fun UserInfoCard(
                 contentDescription = item.name,
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(36.dp)),
                 contentScale = ContentScale.Crop
             )
         },
         label = {
             Text(
                 text = item.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.basicMarquee(),
                 maxLines = 1,
                 overflow = TextOverflow.Clip,
@@ -571,7 +683,8 @@ fun UserInfoCard(
         },
         secondaryLabel = {
             Text(
-                text = "粉丝: ${item.fans}",
+                text = "${formatCount(item.fans)}粉丝",
+                style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.basicMarquee(),
                 maxLines = 1,
                 overflow = TextOverflow.Clip
@@ -587,77 +700,15 @@ fun ArticleCardItem(
     modifier: Modifier = Modifier,
     transformation: SurfaceTransformation? = null
 ) {
-    val coverUrl = if (item.cover.contains("@")) item.cover else "${item.cover}@480w_270h_1c.webp"
-
-    Card(
+    RecommendVideoCard(
+        item = VideoCard(
+            title = item.title,
+            cover = item.cover,
+            upName = item.upName,
+            view = item.view
+        ),
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(110.dp),
-        shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(0.dp),
+        modifier = modifier,
         transformation = transformation
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = coil.request.ImageRequest.Builder(LocalContext.current)
-                    .data(coverUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.8f),
-                            Color.Black.copy(alpha = 0.1f),
-                            Color.Black.copy(alpha = 0.8f)
-                        )
-                    )
-                )
-            )
-            Column(
-                modifier = Modifier.fillMaxSize().padding(12.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    val titleText = if (item.title.contains("<em")) {
-                        parseHighlightedTitle(item.title)
-                    } else {
-                        AnnotatedString(item.title)
-                    }
-                    Text(
-                        text = titleText,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = item.upName,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = item.view,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-        }
-    }
+    )
 }

@@ -1,5 +1,7 @@
 package com.qx.orbit.bili.presentation
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -9,6 +11,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,9 +29,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
@@ -38,6 +45,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.mutableIntStateOf
+import com.qx.orbit.bili.data.api.UserInfoApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +66,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -52,9 +74,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -85,6 +111,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.gson.Gson
 import com.qx.orbit.bili.R
+import com.qx.orbit.bili.data.api.BilibiliIDConverter
 import com.qx.orbit.bili.data.model.Emote
 import com.qx.orbit.bili.data.model.PlayerData
 import com.qx.orbit.bili.data.model.Reply
@@ -92,9 +119,14 @@ import com.qx.orbit.bili.data.model.VideoCard
 import com.qx.orbit.bili.data.model.VideoInfo
 import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
 import com.qx.orbit.bili.presentation.viewmodel.VideoDetailViewModel
+import com.qx.orbit.bili.util.LinkResolver
+import com.qx.orbit.bili.util.SharedPreferencesUtil
 import com.qx.orbit.bili.util.formatCount
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -106,6 +138,7 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
     val videoInfo by viewModel.videoInfo.collectAsState()
     val tags by viewModel.tags.collectAsState()
     val replies by viewModel.replies.collectAsState()
+    val replyCount by viewModel.replyCount.collectAsState()
     val relatedVideos by viewModel.relatedVideos.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     var showCoinDialog by remember { mutableStateOf(false) }
@@ -151,16 +184,17 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                             tags = tags, 
                             focusRequester = focusRequesters[0],
                             onPlayClick = {
-                                val info = videoInfo
-                                if (info == null) return@VideoInfoPage
+                                val info = videoInfo ?: return@VideoInfoPage
                                 // Launch PlayerActivity
+                                val qn = SharedPreferencesUtil.getInt("play_qn", 16)
                                 val playerData = PlayerData(
                                     title = info.title,
                                     aid = aid,
                                     cid = info.cids.firstOrNull() ?: 0L,
                                     cids = info.cids,
                                     pagenames = info.pagenames,
-                                    type = if (info.epid > 0) PlayerData.TYPE_BANGUMI else PlayerData.TYPE_VIDEO
+                                    type = if (info.epid > 0) PlayerData.TYPE_BANGUMI else PlayerData.TYPE_VIDEO,
+                                    qn = qn
                                 )
                                 val jsonStr = Gson().toJson(playerData)
                                 val encodedJson = URLEncoder.encode(jsonStr, StandardCharsets.UTF_8.toString())
@@ -171,12 +205,22 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                             onFavClick = { 
                                 viewModel.loadFavoriteFolders()
                                 showFavDialog = true
+                            },
+                            onUpClick = { mid ->
+                                navController.navigate("user_space/$mid")
                             }
                         )
                         1 -> VideoCommentsPage(
                             replies = replies, 
+                            replyCount = replyCount,
                             focusRequester = focusRequesters[1],
+                            navController = navController,
                             onLoadMore = { viewModel.loadReplies() },
+                            onClick = { reply ->
+                                val json = Gson().toJson(reply)
+                                val encoded = URLEncoder.encode(json, "UTF-8")
+                                navController.navigate("reply_detail/$encoded")
+                            },
                             onLikeClick = { reply -> viewModel.likeReply(reply.rpid, reply.liked) },
                             onReplyClick = { reply ->
                                 replyTarget = reply
@@ -226,48 +270,150 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
         onClose = { showWriteReply = false }
     )
     
+    var currentCoins by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(showCoinDialog) {
+        if (showCoinDialog) {
+            try {
+                currentCoins = UserInfoApi.getCurrentUserCoin()
+            } catch (e: Exception) {}
+        }
+    }
+    
     Dialog(visible = showCoinDialog, onDismissRequest = { showCoinDialog = false }) {
+        var selectedCoinIndex by remember { mutableIntStateOf(0) }
+        val rowOffsetX by animateDpAsState(targetValue = if (selectedCoinIndex == 0) 45.dp else (-45).dp)
+        
+        val scaleBox1 by animateFloatAsState(targetValue = if (selectedCoinIndex == 0) 1f else 0.8f)
+        val scaleBox2 by animateFloatAsState(targetValue = if (selectedCoinIndex == 1) 1f else 0.8f)
+        
+        val dragYDpAnim = remember { androidx.compose.animation.core.Animatable(0f) }
+        val blockJumpAnim = remember { androidx.compose.animation.core.Animatable(0f) }
+        var isHit by remember { mutableStateOf(false) }
+        val coroutineScope = rememberCoroutineScope()
+        val density = LocalDensity.current
+        
+        LaunchedEffect(isHit) {
+            if (isHit) {
+                blockJumpAnim.animateTo(-15f, tween(100))
+                blockJumpAnim.animateTo(0f, tween(100))
+            }
+        }
+
         Box(
-            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+            modifier = Modifier.fillMaxSize().background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(horizontal = 24.dp)
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxSize()
             ) {
-                Text(
-                    "投币",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures { _, dragAmount ->
+                                if (!isHit) {
+                                    if (dragAmount < -10) selectedCoinIndex = 1
+                                    else if (dragAmount > 10) selectedCoinIndex = 0
+                                }
+                            }
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .clickable { viewModel.doCoin(1); showCoinDialog = false }
-                            .padding(16.dp)
+                    Row(
+                        modifier = Modifier.offset(x = rowOffsetX),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("1", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("币", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .clickable { viewModel.doCoin(2); showCoinDialog = false }
-                            .padding(16.dp)
-                    ) {
-                        Text("2", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimary)
-                        Text("币", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary)
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp).offset(y = if (selectedCoinIndex == 0) blockJumpAnim.value.dp else 0.dp).graphicsLayer { scaleX = scaleBox1; scaleY = scaleBox1 }) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_pay_coins_box),
+                                contentDescription = null,
+                                modifier = Modifier.size(80.dp)
+                            )
+                            Image(
+                                painter = painterResource(R.drawable.ic_coins_one),
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp).offset(y = if (selectedCoinIndex == 1) blockJumpAnim.value.dp else 0.dp).graphicsLayer { scaleX = scaleBox2; scaleY = scaleBox2 }) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_pay_coins_box),
+                                contentDescription = null,
+                                modifier = Modifier.size(80.dp)
+                            )
+                            Image(
+                                painter = painterResource(R.drawable.ic_coins_two),
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
                     }
                 }
+                
+                Spacer(modifier = Modifier.height(2.dp))
+                
+                Image(
+                    painter = painterResource(if (selectedCoinIndex == 0) R.drawable.ic_22_mario else R.drawable.ic_22_gun_sister),
+                    contentDescription = "2233",
+                    modifier = Modifier
+                        .size(72.dp)
+                        .offset(y = dragYDpAnim.value.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures {
+                                if (!isHit) {
+                                    isHit = true
+                                    coroutineScope.launch {
+                                        dragYDpAnim.animateTo(-30f, tween(150))
+                                        viewModel.doCoin(selectedCoinIndex + 1)
+                                        dragYDpAnim.animateTo(0f, tween(150))
+                                        delay(100)
+                                        showCoinDialog = false
+                                    }
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures(
+                                onDragEnd = {
+                                    if (!isHit) {
+                                        coroutineScope.launch {
+                                            dragYDpAnim.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                        }
+                                    }
+                                },
+                                onVerticalDrag = { _, dragAmount ->
+                                    if (!isHit) {
+                                        val dragDp = with(density) { dragAmount.toDp().value }
+                                        coroutineScope.launch {
+                                            val nextY = (dragYDpAnim.value + dragDp).coerceAtMost(0f)
+                                            if (nextY <= -30f && dragYDpAnim.value > -30f) {
+                                                isHit = true
+                                                dragYDpAnim.snapTo(-30f)
+                                                viewModel.doCoin(selectedCoinIndex + 1)
+                                                dragYDpAnim.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                                delay(100)
+                                                showCoinDialog = false
+                                            } else if (nextY > -30f) {
+                                                dragYDpAnim.snapTo(nextY)
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Text(
+                    text = if (currentCoins >= 0) "剩余硬币: $currentCoins" else "剩余硬币: 获取中...",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
             }
         }
     }
@@ -335,7 +481,8 @@ fun VideoInfoPage(
     onPlayClick: () -> Unit,
     onLikeClick: () -> Unit,
     onCoinClick: () -> Unit,
-    onFavClick: () -> Unit
+    onFavClick: () -> Unit,
+    onUpClick: (Long) -> Unit
 ) {
     val listState = rememberTransformingLazyColumnState()
     val transformationSpec = rememberTransformationSpec()
@@ -417,7 +564,7 @@ fun VideoInfoPage(
                                 }
                                 .clip(RoundedCornerShape(50))
                                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                                .clickable(onClick = { /* TODO: Go to UP Space */ })
+                                .clickable(onClick = { onUpClick(upInfo.mid) })
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -496,7 +643,7 @@ fun VideoInfoPage(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(
-                                imageVector = Icons.Filled.List,
+                                imageVector = Icons.AutoMirrored.Filled.List,
                                 contentDescription = "Danmaku",
                                 modifier = Modifier.size(12.dp),
                                 tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
@@ -655,8 +802,11 @@ fun VideoInfoPage(
 @Composable
 fun VideoCommentsPage(
     replies: List<Reply>, 
+    replyCount: Int,
     focusRequester: FocusRequester,
+    navController: NavHostController,
     onLoadMore: () -> Unit,
+    onClick: (Reply) -> Unit,
     onLikeClick: (Reply) -> Unit,
     onReplyClick: (Reply) -> Unit,
     onSendCommentClick: () -> Unit
@@ -672,7 +822,7 @@ fun VideoCommentsPage(
             item {
                 ListHeader{
                     Text(
-                        "评论(${formatCount(replies.size)})",
+                        "评论(${formatCount(replyCount)})",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.fillMaxWidth()
@@ -697,8 +847,9 @@ fun VideoCommentsPage(
                     reply = replies[index],
                     transformation = SurfaceTransformation(transformationSpec),
                     modifier = Modifier.transformedHeight(this, transformationSpec),
+                    navController = navController,
                     onLikeClick = { onLikeClick(replies[index]) },
-                    //onClick = { onClick(replies[index]) },
+                    onClick = { onClick(replies[index]) },
                     onReplyClick = { onReplyClick(replies[index]) }
                 )
             }
@@ -711,12 +862,32 @@ fun ReplyCard(
     reply: Reply,
     modifier: Modifier = Modifier,
     transformation: SurfaceTransformation,
+    navController: NavHostController,
     onClick: () -> Unit = {},
     onLikeClick: () -> Unit = {},
     onReplyClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    var linkClicked by remember { mutableStateOf(false) }
+    var resolvedB23Links by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    
+    LaunchedEffect(reply.message) {
+        val b23Pattern = Regex("https?://b23\\.tv/\\S+", RegexOption.IGNORE_CASE)
+        val b23Links = b23Pattern.findAll(reply.message).map { it.value }.toList()
+        if (b23Links.isNotEmpty()) {
+            val resolved = mutableMapOf<String, String>()
+            for (link in b23Links) {
+                withContext(Dispatchers.IO) {
+                    LinkResolver.resolveB23Link(link)?.let { bv ->
+                        resolved[link] = bv
+                    }
+                }
+            }
+            resolvedB23Links = resolved
+        }
+    }
     Card(
-        onClick = { onClick },
+        onClick = { if (!linkClicked) onClick() else linkClicked = false },
         modifier = modifier.fillMaxWidth(),
         transformation = transformation,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
@@ -738,12 +909,38 @@ fun ReplyCard(
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
-            val (richText, inlineContent) = parseRichText(reply.message, reply.emotes)
+            val (richText, inlineContent) = parseRichText(reply.message, reply.emotes, resolvedB23Links)
+            val textLayoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
             Text(
                 text = richText,
                 inlineContent = inlineContent,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        val pos = textLayoutResult.value?.getOffsetForPosition(offset) ?: -1
+                        if (pos >= 0) {
+                            richText.getStringAnnotations(tag = "URL", start = pos, end = pos).firstOrNull()?.let { annotation ->
+                                linkClicked = true
+                                val url = annotation.item.removePrefix("url:")
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            }
+                            richText.getStringAnnotations(tag = "VIDEO", start = pos, end = pos).firstOrNull()?.let { annotation ->
+                                linkClicked = true
+                                val videoId = annotation.item.removePrefix("video:")
+                                val aid = if (videoId.startsWith("av", ignoreCase = true)) videoId.removePrefix("av").toLongOrNull() ?: 0L else 0L
+                                val bvid = if (videoId.startsWith("bv", ignoreCase = true)) videoId else BilibiliIDConverter.aidToBv(aid)
+                                if (aid > 0 || bvid.isNotEmpty()) {
+                                    navController.navigate("detail/$bvid/$aid")
+                                }
+                            }
+                        }
+                    }
+                },
+                onTextLayout = { textLayoutResult.value = it }
             )
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -831,44 +1028,92 @@ fun VideoRelatedPage(
 }
 
 @Composable
-fun parseRichText(text: String, emotes: Map<String, Emote>): Pair<AnnotatedString, Map<String, InlineTextContent>> {
+fun parseRichText(
+    text: String,
+    emotes: Map<String, Emote>,
+    resolvedB23Links: Map<String, String> = emptyMap()
+): Pair<AnnotatedString, Map<String, InlineTextContent>> {
     val inlineContentMap = mutableMapOf<String, InlineTextContent>()
+    
+    var processedText = text
+        .replace("<br>", "\n")
+        .replace("<br/>", "\n")
+        .replace("<br />", "\n")
+        .replace(Regex("<[^>]+>"), "")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+    
+    for ((b23Link, bv) in resolvedB23Links) {
+        processedText = processedText.replace(b23Link, bv)
+    }
+    
+    val urlPattern = "(https?://[^\\s<>()\\[\\]\"',;!?]+|www\\.[^\\s<>()\\[\\]\"',;!?]+)"
+    val videoPattern = "(?i)(bv[A-Za-z0-9]+|av\\d+)"
+    val fullPattern = Regex("($urlPattern|$videoPattern)")
+    
     val annotatedString = buildAnnotatedString {
-        if (emotes.isEmpty()) {
-            append(text)
+        if (emotes.isEmpty() && !processedText.contains(fullPattern)) {
+            append(processedText)
             return@buildAnnotatedString
         }
-        val pattern = "\\[[^\\]]+\\]".toRegex()
-        var lastIndex = 0
-        val matches = pattern.findAll(text)
-        for (match in matches) {
-            val emoteKey = match.value
-            val emote = emotes[emoteKey]
-            if (emote != null) {
-                append(text.substring(lastIndex, match.range.first))
-                val inlineId = emoteKey
-                appendInlineContent(inlineId, emoteKey)
-                if (!inlineContentMap.containsKey(inlineId)) {
-                    val sizeSp = (emote.size * 18).sp
-                    inlineContentMap[inlineId] = InlineTextContent(
-                        Placeholder(
-                            width = sizeSp,
-                            height = sizeSp,
-                            placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
-                        )
-                    ) {
-                        AsyncImage(
-                            model = emote.url,
-                            contentDescription = emote.name,
-                            modifier = Modifier.fillMaxSize()
-                        )
+        
+        val parts = processedText.split(fullPattern)
+        val matches = fullPattern.findAll(processedText).toList()
+        
+        for (i in parts.indices) {
+            val part = parts[i]
+            if (part.isNotEmpty()) {
+                if (emotes.isNotEmpty()) {
+                    val emotePattern = "\\[[^]]+]".toRegex()
+                    var lastIdx = 0
+                    for (emoteMatch in emotePattern.findAll(part)) {
+                        val emoteKey = emoteMatch.value
+                        val emote = emotes[emoteKey]
+                        if (emote != null) {
+                            append(part.substring(lastIdx, emoteMatch.range.first))
+                            appendInlineContent(emoteKey, emoteKey)
+                            if (!inlineContentMap.containsKey(emoteKey)) {
+                                val sizeSp = (emote.size * 18).sp
+                                inlineContentMap[emoteKey] = InlineTextContent(
+                                    Placeholder(
+                                        width = sizeSp,
+                                        height = sizeSp,
+                                        placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
+                                    )
+                                ) {
+                                    AsyncImage(
+                                        model = emote.url,
+                                        contentDescription = emote.name,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+                            lastIdx = emoteMatch.range.last + 1
+                        }
                     }
+                    if (lastIdx < part.length) {
+                        append(part.substring(lastIdx))
+                    }
+                } else {
+                    append(part)
                 }
-                lastIndex = match.range.last + 1
             }
-        }
-        if (lastIndex < text.length) {
-            append(text.substring(lastIndex))
+            
+            if (i < matches.size) {
+                val match = matches[i].value.trimEnd('.', ',', ';', ':', '!', '?')
+                val isVideo = match.matches(Regex("(?i)(bv[A-Za-z0-9]+|av\\d+)"))
+                val tag = if (isVideo) "VIDEO" else "URL"
+                val annotation = if (isVideo) "video:$match" else "url:${if (match.startsWith("www.")) "https://$match" else match}"
+                pushStringAnnotation(tag = tag, annotation = annotation)
+                withStyle(SpanStyle(color = Color(0xFF4FC3F7), textDecoration = TextDecoration.Underline)) {
+                    append(match)
+                }
+                pop()
+            }
         }
     }
     return Pair(annotatedString, inlineContentMap)

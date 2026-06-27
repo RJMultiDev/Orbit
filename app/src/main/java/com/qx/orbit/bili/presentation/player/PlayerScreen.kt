@@ -29,6 +29,7 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +49,7 @@ import com.qx.orbit.bili.data.api.PlayerApi
 import com.qx.orbit.bili.data.model.PlayerData
 import com.qx.orbit.bili.data.remote.CookieManager
 import com.qx.orbit.bili.util.SharedPreferencesUtil
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -57,6 +59,7 @@ import master.flame.danmaku.danmaku.parser.android.BiliProtobufDanmakuParser
 import master.flame.danmaku.ui.widget.DanmakuView
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
 
+@OptIn(DelicateCoroutinesApi::class)
 @Composable
 fun PlayerScreen(
     initialData: PlayerData,
@@ -75,12 +78,14 @@ fun PlayerScreen(
     var isPrepared by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
     var showControls by remember { mutableStateOf(true) }
-    var currentProgress by remember { mutableStateOf(0L) }
-    var totalDuration by remember { mutableStateOf(0L) }
+    var currentProgress by remember { mutableLongStateOf(0L) }
+    var totalDuration by remember { mutableLongStateOf(0L) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var bufferSpeed by remember { mutableStateOf("") }
     
     var dragProgress by remember { mutableFloatStateOf(-1f) }
     var isLongPressSpeedUp by remember { mutableStateOf(false) }
+    var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
 
     val mediaPlayer = remember { IjkMediaPlayer() }
     val danmakuView = remember { DanmakuView(context) }
@@ -107,6 +112,29 @@ fun PlayerScreen(
         while(isPlaying && isPrepared) {
             currentProgress = mediaPlayer.currentPosition
             delay(1000)
+        }
+    }
+
+    LaunchedEffect(isLoading) {
+        if (isLoading) {
+            if (!isPrepared) {
+                bufferSpeed = "加载中..."
+            } else {
+                var lastProgress = currentProgress
+                while (isLoading) {
+                    delay(1000)
+                    val current = mediaPlayer.currentPosition
+                    val speed = (current - lastProgress) / 1000
+                    bufferSpeed = if (speed > 0) {
+                        "+${speed}s/s"
+                    } else {
+                        "缓冲中..."
+                    }
+                    lastProgress = current
+                }
+            }
+        } else {
+            bufferSpeed = ""
         }
     }
 
@@ -164,7 +192,7 @@ fun PlayerScreen(
                 mediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
                 mediaPlayer.dataSource = result.videoUrl
                 surfaceHolder?.let { mediaPlayer.setDisplay(it) }
-                if (com.qx.orbit.bili.util.SharedPreferencesUtil.getBoolean("player_loop", false)) {
+                if (SharedPreferencesUtil.getBoolean("player_loop", false)) {
                     mediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "loop", 1)
                 }
                 mediaPlayer.prepareAsync()
@@ -202,11 +230,13 @@ fun PlayerScreen(
                     when (what) {
                         IjkMediaPlayer.MEDIA_INFO_BUFFERING_START -> {
                             danmakuView.pause()
+                            isLoading = true
                         }
                         IjkMediaPlayer.MEDIA_INFO_BUFFERING_END -> {
                             if (isPlaying) {
                                 danmakuView.resume()
                             }
+                            isLoading = false
                         }
                     }
                     true
@@ -221,18 +251,18 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(isLongPressSpeedUp) {
+    LaunchedEffect(isLongPressSpeedUp, playbackSpeed) {
         if (isLongPressSpeedUp) {
             try { mediaPlayer.setSpeed(2.0f) } catch(e:Exception){}
             try { danmakuView.setSpeed(2.0f) } catch(e:Exception){}
         } else {
-            try { mediaPlayer.setSpeed(1.0f) } catch(e:Exception){}
-            try { danmakuView.setSpeed(1.0f) } catch(e:Exception){}
+            try { mediaPlayer.setSpeed(playbackSpeed) } catch(e:Exception){}
+            try { danmakuView.setSpeed(playbackSpeed) } catch(e:Exception){}
         }
     }
 
-    val view = androidx.compose.ui.platform.LocalView.current
-    val viewConfiguration = androidx.compose.ui.platform.LocalViewConfiguration.current
+    val view = LocalView.current
+    val viewConfiguration = LocalViewConfiguration.current
     DisposableEffect(Unit) {
         view.keepScreenOn = true
         val startTs = System.currentTimeMillis() / 1000
@@ -243,7 +273,7 @@ fun PlayerScreen(
                 currentPosSeconds = mediaPlayer.currentPosition / 1000
             } catch (e: Exception) {}
 
-            kotlinx.coroutines.GlobalScope.launch {
+            GlobalScope.launch {
                 try {
                     HistoryApi.reportHistory(playerData.aid, playerData.cid, currentPosSeconds)
                     HeartbeatApi.reportHeartbeat(
@@ -393,7 +423,20 @@ fun PlayerScreen(
         }
 
         if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator()
+                if (bufferSpeed.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = bufferSpeed,
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
         }
 
         errorMessage?.let {
@@ -466,6 +509,31 @@ fun PlayerScreen(
                 ) {
                     IconButton(
                         onClick = {
+                            playbackSpeed = when (playbackSpeed) {
+                                1.0f -> 1.5f
+                                1.5f -> 2.0f
+                                2.0f -> 0.5f
+                                else -> 1.0f
+                            }
+                        },
+                        modifier = Modifier.align(Alignment.CenterStart).offset(x = (-16).dp)
+                    ) {
+                        val iconRes = when (playbackSpeed) {
+                            0.5f -> R.drawable.speed_0_5x
+                            1.5f -> R.drawable.speed_1_5x
+                            2.0f -> R.drawable.speed_2x
+                            else -> R.drawable.speed_1x
+                        }
+                        Icon(
+                            painter = painterResource(iconRes),
+                            contentDescription = "Playback Speed",
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
                             if (isPlaying) {
                                 mediaPlayer.pause()
                                 danmakuView.pause()
@@ -480,21 +548,21 @@ fun PlayerScreen(
                         Icon(
                             painter = painterResource(if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play),
                             contentDescription = "Play/Pause",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(36.dp)
                         )
                     }
 
                     if (SharedPreferencesUtil.getBoolean("player_ui_showDanmakuBtn", true)) {
                         IconButton(
                             onClick = { showDanmaku = !showDanmaku },
-                            modifier = Modifier.align(Alignment.CenterEnd)
+                            modifier = Modifier.align(Alignment.CenterEnd).offset(x = 16.dp)
                         ) {
-                            Text(
-                                text = "弹",
-                                color = if (showDanmaku) Color.White else Color.Gray,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
+                            Icon(
+                                painter = painterResource(if (showDanmaku) R.drawable.ic_danmaku_inline_switch_v2_on else R.drawable.ic_danmaku_inline_switch_v2_off),
+                                contentDescription = "Toggle Danmaku",
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                     }

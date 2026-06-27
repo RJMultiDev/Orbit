@@ -40,6 +40,19 @@ data class DashData(
     val dolbyAudio: DashAudioStream? = null,
     val flacAudio: DashAudioStream? = null
 ) {
+    fun getVideoStream(qn: Int): DashVideoStream? {
+        val exact = videoStreams.find { it.id == qn }
+        if (exact != null) return exact
+        return videoStreams.filter { it.id <= qn }.maxByOrNull { it.id }
+            ?: videoStreams.minByOrNull { kotlin.math.abs(it.id - qn) }
+    }
+
+    fun getBestAudioStream(): DashAudioStream? {
+        if (flacAudio != null) return flacAudio
+        if (dolbyAudio != null) return dolbyAudio
+        return audioStreams.maxByOrNull { it.bandwidth }
+    }
+
     companion object {
         fun fromJson(json: JSONObject): DashData {
             val video = mutableListOf<DashVideoStream>()
