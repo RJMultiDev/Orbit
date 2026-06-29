@@ -17,6 +17,9 @@ class UserSpaceViewModel : ViewModel() {
     private val _userInfo = MutableStateFlow<UserInfo?>(null)
     val userInfo: StateFlow<UserInfo?> = _userInfo.asStateFlow()
 
+    private val _isFollowed = MutableStateFlow(false)
+    val isFollowed: StateFlow<Boolean> = _isFollowed.asStateFlow()
+
     private val _dynamics = MutableStateFlow<List<Dynamic>>(emptyList())
     val dynamics: StateFlow<List<Dynamic>> = _dynamics.asStateFlow()
     private var dynamicOffset: String = ""
@@ -44,11 +47,29 @@ class UserSpaceViewModel : ViewModel() {
         if (this.mid == mid) return
         this.mid = mid
         viewModelScope.launch {
-            _userInfo.value = UserInfoApi.getUserInfo(mid)
+            val info = UserInfoApi.getUserInfo(mid)
+            _userInfo.value = info
+            _isFollowed.value = info?.followed ?: false
         }
         loadMoreDynamics()
         loadMoreVideos()
         loadMoreArticles()
+    }
+
+    fun toggleFollow() {
+        val info = _userInfo.value ?: return
+        val currentFollowed = _isFollowed.value
+        viewModelScope.launch {
+            _isFollowed.value = !currentFollowed
+            try {
+                val result = UserInfoApi.followUser(info.mid, !currentFollowed)
+                if (result != 0) {
+                    _isFollowed.value = currentFollowed
+                }
+            } catch (e: Exception) {
+                _isFollowed.value = currentFollowed
+            }
+        }
     }
 
     fun loadMoreDynamics() {

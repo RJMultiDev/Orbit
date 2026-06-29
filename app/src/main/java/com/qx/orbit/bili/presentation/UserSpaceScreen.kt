@@ -92,9 +92,12 @@ fun UserSpaceScreen(
     val dynamics by viewModel.dynamics.collectAsState()
     val videos by viewModel.videos.collectAsState()
     val articles by viewModel.articles.collectAsState()
+    val isFollowed by viewModel.isFollowed.collectAsState()
 
     val pagerState = rememberPagerState(pageCount = { 3 })
     val focusRequesters = remember { List(3) { FocusRequester() } }
+    val currentMid = remember { com.qx.orbit.bili.data.remote.CookieManager.getMid() }
+    val isSelf = mid == currentMid
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         AnimatedContent(
@@ -120,7 +123,7 @@ fun UserSpaceScreen(
                         }
 
                         when (page) {
-                            0 -> UserDynamicsPage(userInfo, dynamics, focusRequesters[0], navController, viewModel)
+                            0 -> UserDynamicsPage(userInfo, dynamics, focusRequesters[0], navController, viewModel, isFollowed, isSelf)
                             1 -> UserVideosPage(videos, focusRequesters[1], navController, viewModel)
                             2 -> UserArticlesPage(articles, focusRequesters[2], navController, viewModel)
                         }
@@ -141,7 +144,9 @@ fun UserDynamicsPage(
     dynamics: List<Dynamic>,
     focusRequester: FocusRequester,
     navController: NavHostController,
-    viewModel: UserSpaceViewModel
+    viewModel: UserSpaceViewModel,
+    isFollowed: Boolean = false,
+    isSelf: Boolean = false
 ) {
     val listState = rememberTransformingLazyColumnState()
     val transformationSpec = rememberTransformationSpec()
@@ -206,13 +211,29 @@ fun UserDynamicsPage(
                         Text(text = "粉丝: ${info.fans} · 关注: ${info.following}", fontSize = 12.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = info.sign, 
-                            fontSize = 12.sp, 
-                            color = Color.Gray, 
-                            maxLines = if (signExpanded.value) Int.MAX_VALUE else 1, 
+                            text = info.sign,
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            maxLines = if (signExpanded.value) Int.MAX_VALUE else 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.clickable { signExpanded.value = !signExpanded.value }
                         )
+                        if (!isSelf) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            androidx.wear.compose.material3.Button(
+                                onClick = { viewModel.toggleFollow() },
+                                colors = androidx.wear.compose.material3.ButtonDefaults.buttonColors(
+                                    containerColor = if (isFollowed) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.primary,
+                                    contentColor = if (isFollowed) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary
+                                ),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(
+                                    text = if (isFollowed) "已关注" else "关注",
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
