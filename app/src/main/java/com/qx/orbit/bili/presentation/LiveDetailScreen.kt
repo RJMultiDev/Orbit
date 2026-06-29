@@ -101,6 +101,7 @@ fun LiveDetailScreen(
     val pagerState = rememberPagerState(pageCount = { 3 })
     val focusRequesters = remember { List(3) { FocusRequester() } }
     var showWriteReply by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(pagerState.currentPage) {
         try {
@@ -169,7 +170,7 @@ fun LiveDetailScreen(
                             danmakuCount = danmakuCount,
                             focusRequester = focusRequesters[1],
                                 onSendDanmaku = {
-                                    viewModel.loadEmotes()
+                                    viewModel.loadEmotes(roomId)
                                     showWriteReply = true
                                 }
                             )
@@ -196,8 +197,13 @@ fun LiveDetailScreen(
             targetName = null,
             emotes = emotes,
             onSend = { text ->
-                viewModel.sendDanmaku(text, roomId)
-                showWriteReply = false
+                viewModel.sendDanmaku(text, roomId) { ok, msg ->
+                    if (ok) {
+                        showWriteReply = false
+                    } else {
+                        android.widget.Toast.makeText(context, "发送失败: $msg", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
             },
             onClose = { showWriteReply = false }
     )
