@@ -1,12 +1,6 @@
 package com.qx.orbit.bili.presentation
-import com.qx.orbit.bili.presentation.component.WysTimeText
+import com.qx.orbit.bili.presentation.ui.components.WysTimeText
 
-import android.app.Activity
-import android.content.Intent
-import android.os.Bundle
-import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -42,10 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,19 +50,14 @@ import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
 import com.qx.orbit.bili.presentation.ui.components.UserAvatar
 import com.qx.orbit.bili.presentation.ui.components.UserNameText
-import androidx.compose.foundation.focusable
 import androidx.wear.compose.material3.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.Text as Material3Text
-import androidx.compose.material3.Text as Material3Text
-import coil.compose.AsyncImage
 import com.qx.orbit.bili.data.model.*
 import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
-import com.qx.orbit.bili.presentation.util.parseHighlightedTitle
 import com.qx.orbit.bili.presentation.viewmodel.SearchTab
 import com.qx.orbit.bili.presentation.viewmodel.SearchViewModel
 import java.net.URLEncoder
@@ -79,12 +65,9 @@ import java.nio.charset.StandardCharsets
 import androidx.wear.compose.material3.SwipeToReveal
 import androidx.wear.compose.material3.SwipeToRevealDefaults
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
 import com.qx.orbit.bili.util.SharedPreferencesUtil
 import com.qx.orbit.bili.data.api.BilibiliIDConverter
 import com.qx.orbit.bili.util.formatCount

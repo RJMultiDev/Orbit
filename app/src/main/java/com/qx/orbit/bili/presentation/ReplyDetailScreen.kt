@@ -26,8 +26,7 @@ import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
 import com.qx.orbit.bili.data.model.Reply
 import com.qx.orbit.bili.presentation.viewmodel.ReplyDetailViewModel
-import com.qx.orbit.bili.presentation.component.WysTimeText
-import com.qx.orbit.bili.util.formatCount
+import com.qx.orbit.bili.presentation.ui.components.WysTimeText
 
 @Composable
 fun ReplyDetailScreen(

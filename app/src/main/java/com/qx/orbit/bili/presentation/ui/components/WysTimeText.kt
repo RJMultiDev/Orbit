@@ -1,4 +1,4 @@
-package com.qx.orbit.bili.presentation.component
+package com.qx.orbit.bili.presentation.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
