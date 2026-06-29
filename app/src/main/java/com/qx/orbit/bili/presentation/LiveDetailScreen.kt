@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,13 +38,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
@@ -67,14 +71,11 @@ import androidx.wear.compose.material3.lazy.transformedHeight
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.gson.Gson
-import com.qx.orbit.bili.R
 import com.qx.orbit.bili.data.model.LiveRoom
 import com.qx.orbit.bili.data.model.PlayerData
-import com.qx.orbit.bili.data.model.Reply
-import com.qx.orbit.bili.presentation.component.WysTimeText
-import com.qx.orbit.bili.presentation.theme.BiliPink
 import com.qx.orbit.bili.presentation.ui.components.UserAvatar
 import com.qx.orbit.bili.presentation.ui.components.UserNameText
+import com.qx.orbit.bili.presentation.viewmodel.EmoteInline
 import com.qx.orbit.bili.presentation.viewmodel.LiveDetailViewModel
 import com.qx.orbit.bili.util.formatCount
 import java.net.URLEncoder
@@ -494,10 +495,9 @@ fun LiveDanmakuPage(
                 val textColor = if (msg.isSystem) MaterialTheme.colorScheme.onSurfaceVariant
                 else Color(msg.color or 0xFF000000.toInt())
 
-                Text(
-                    text = msg.text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = textColor,
+                DanmakuMessageText(
+                    msg = msg,
+                    textColor = textColor,
                     modifier = Modifier
                         .transformedHeight(this, transformationSpec)
                         .graphicsLayer {
@@ -537,6 +537,101 @@ fun LiveDanmakuPage(
             item { Spacer(modifier = Modifier.height(32.dp)) }
         }
     }
+}
+
+private const val INLINE_CONTENT_TAG = "androidx.compose.foundation.text.inlineContent"
+
+private fun AnnotatedString.Builder.appendInlineContentId(id: String, placeholderText: String) {
+    append(placeholderText)
+    val end = length
+    val start = end - placeholderText.length
+    addStringAnnotation(INLINE_CONTENT_TAG, id, start, end)
+}
+
+private fun buildDanmakuAnnotatedText(text: String, emotes: Map<String, EmoteInline>?): Pair<AnnotatedString, Map<String, InlineTextContent>> {
+    if (emotes.isNullOrEmpty() || emotes.keys.none { text.contains(it) }) {
+        return AnnotatedString(text) to emptyMap()
+    }
+    val sortedKeys = emotes.keys.sortedByDescending { it.length }
+    val regex = Regex(sortedKeys.joinToString("|") { Regex.escape(it) })
+    val inlineContent = mutableMapOf<String, InlineTextContent>()
+    val annotated = buildAnnotatedString {
+        var lastIndex = 0
+        regex.findAll(text).forEach { match ->
+            if (match.range.first > lastIndex) {
+                append(text.substring(lastIndex, match.range.first))
+            }
+            val key = match.value
+            val emote = emotes[key] ?: return@forEach
+            val id = "emote_${key.hashCode()}"
+            inlineContent[id] = InlineTextContent(
+                placeholder = Placeholder(
+                    width = 1.2.em,
+                    height = 1.2.em,
+                    placeholderVerticalAlign = PlaceholderVerticalAlign.Center
+                )
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(emote.url)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = key,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
+            appendInlineContentId(id, key)
+            lastIndex = match.range.last + 1
+        }
+        if (lastIndex < text.length) {
+            append(text.substring(lastIndex))
+        }
+    }
+    return annotated to inlineContent
+}
+
+@Composable
+private fun DanmakuMessageText(
+    msg: com.qx.orbit.bili.presentation.viewmodel.DanmakuMessage,
+    textColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val single = msg.singleEmote
+    if (single != null) {
+        val annotated = buildAnnotatedString { appendInlineContentId("single_emote", "[emote]") }
+        Text(
+            text = annotated,
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor,
+            modifier = modifier,
+            inlineContent = mapOf(
+                "single_emote" to InlineTextContent(
+                    placeholder = Placeholder(1.5.em, 1.5.em, PlaceholderVerticalAlign.Center)
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(single.url)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "emote",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            )
+        )
+        return
+    }
+    val text = msg.text
+    val (annotated, inline) = remember(text, msg.emotes) { buildDanmakuAnnotatedText(text, msg.emotes) }
+    Text(
+        text = annotated,
+        style = MaterialTheme.typography.bodySmall,
+        color = textColor,
+        modifier = modifier,
+        inlineContent = inline
+    )
 }
 
 @Composable
