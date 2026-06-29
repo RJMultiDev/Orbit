@@ -342,7 +342,7 @@ fun PlayerScreen(
 
                     val callback = object : PlayerCallback {
                         @SuppressLint("LocalContextResourcesRead")
-                        override fun addDanmaku(text: String, color: Int, textSize: Int, type: Int, borderColor: Int, senderName: String) {
+                        override fun addDanmaku(text: String, color: Int, textSize: Int, type: Int, borderColor: Int, senderName: String, emotes: Map<String, com.qx.orbit.bili.presentation.viewmodel.EmoteInline>?, singleEmote: com.qx.orbit.bili.presentation.viewmodel.EmoteInline?) {
                             try {
                                 val ctx = danmakuContext ?: return
                                 val item = ctx.mDanmakuFactory.createDanmaku(type) ?: return
