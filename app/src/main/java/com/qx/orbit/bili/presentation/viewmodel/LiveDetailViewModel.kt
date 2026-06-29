@@ -20,10 +20,18 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+data class EmoteInline(
+    val url: String,
+    val width: Int,
+    val height: Int
+)
+
 data class DanmakuMessage(
     val text: String,
     val color: Int = 0xFFFFFF,
-    val isSystem: Boolean = false
+    val isSystem: Boolean = false,
+    val emotes: Map<String, EmoteInline>? = null,
+    val singleEmote: EmoteInline? = null
 )
 
 class LiveDetailViewModel : ViewModel() {
@@ -113,8 +121,8 @@ class LiveDetailViewModel : ViewModel() {
                 val mid = CookieManager.getMid()
 
                 val callback = object : PlayerCallback {
-                    override fun addDanmaku(text: String, color: Int, textSize: Int, type: Int, borderColor: Int, senderName: String) {
-                        val msg = DanmakuMessage(text = text, color = color)
+                    override fun addDanmaku(text: String, color: Int, textSize: Int, type: Int, borderColor: Int, senderName: String, emotes: Map<String, EmoteInline>?, singleEmote: EmoteInline?) {
+                        val msg = DanmakuMessage(text = text, color = color, emotes = emotes, singleEmote = singleEmote)
                         _danmakuList.value = (_danmakuList.value + msg).takeLast(200)
                         _danmakuCount.value++
                     }
