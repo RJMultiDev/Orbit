@@ -96,7 +96,6 @@ fun PlayerScreen(
     var longPressUpTimestamp by remember { mutableLongStateOf(0L) }
     var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
     var liveElapsedSeconds by remember { mutableLongStateOf(0L) }
-    var onlineNumber by remember { mutableStateOf("") }
 
     LaunchedEffect(isLive, playerData.timeStamp) {
         if (isLive && playerData.timeStamp > 0) {
@@ -331,10 +330,6 @@ fun PlayerScreen(
                             } catch (_: Exception) {}
                         }
                         override var onlineNumber: String = ""
-                            set(value) {
-                                field = value
-                                onlineNumber = value
-                            }
                         override fun updateTitle(title: String) {}
                     }
 
@@ -661,16 +656,6 @@ fun PlayerScreen(
                         .clickable { onBack() }
                         .basicMarquee()
                 )
-                if (isLive && onlineNumber.isNotEmpty() && SharedPreferencesUtil.getBoolean("player_show_online", true)) {
-                    Text(
-                        text = onlineNumber,
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 11.sp,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 44.dp, start = 24.dp, end = 24.dp)
-                    )
-                }
                 
                 Box(
                     modifier = Modifier
