@@ -1,12 +1,16 @@
 package com.qx.orbit.bili.data.api
 
 import com.qx.orbit.bili.data.model.*
+import com.qx.orbit.bili.data.remote.CookieManager
 import com.qx.orbit.bili.data.remote.GsonConfig
+import com.qx.orbit.bili.data.remote.HttpClient
 import com.qx.orbit.bili.data.remote.Result
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
+import okhttp3.Request
 
 object LiveApi {
 
@@ -242,5 +246,75 @@ object LiveApi {
             }
             is Result.Error -> emptyList()
         }
+    }
+
+    data class SendResult(
+        val ok: Boolean,
+        val message: String
+    )
+
+    private suspend fun doSend(body: FormBody, roomId: Long): SendResult = withContext(Dispatchers.IO) {
+        try {
+            val signedUrl = WbiSigner.signUrl("https://api.live.bilibili.com/msg/send?web_location=444.8")
+            val request = Request.Builder()
+                .url(signedUrl)
+                .post(body)
+                .addHeader("Cookie", CookieManager.getCookie())
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.95 Safari/537.36")
+                .addHeader("Referer", "https://live.bilibili.com/$roomId")
+                .build()
+            HttpClient.client.newCall(request).execute().use { response ->
+                val respBody = response.body?.string().orEmpty()
+                val code = Regex("\"code\"\\s*:\\s*(\\d+)").find(respBody)?.groupValues?.get(1)?.toIntOrNull() ?: -1
+                val msg = Regex("\"message\"\\s*:\\s*\"([^\"]*)\"").find(respBody)?.groupValues?.get(1).orEmpty()
+                SendResult(ok = code == 0, message = msg)
+            }
+        } catch (e: Exception) {
+            SendResult(ok = false, message = e.message ?: "unknown")
+        }
+    }
+
+    suspend fun sendDanmaku(text: String, roomId: Long): SendResult = withContext(Dispatchers.IO) {
+        val csrf = CookieManager.getCsrf()
+        val rnd = (System.currentTimeMillis() / 1000).toString()
+        val body = FormBody.Builder()
+            .add("bubble", "0")
+            .add("msg", text)
+            .add("color", "16777215")
+            .add("mode", "1")
+            .add("room_type", "0")
+            .add("jumpfrom", "0")
+            .add("reply_mid", "0")
+            .add("reply_attr", "0")
+            .add("replay_dmid", "")
+            .add("statistics", "{\"appId\":100,\"platform\":5}")
+            .add("reply_type", "0")
+            .add("reply_uname", "")
+            .add("fontsize", "25")
+            .add("rnd", rnd)
+            .add("roomid", roomId.toString())
+            .add("csrf", csrf)
+            .add("csrf_token", csrf)
+            .build()
+        doSend(body, roomId)
+    }
+
+    suspend fun sendLiveEmote(emoticonUnique: String, roomId: Long): SendResult = withContext(Dispatchers.IO) {
+        val csrf = CookieManager.getCsrf()
+        val rnd = (System.currentTimeMillis() / 1000).toString()
+        val body = FormBody.Builder()
+            .add("bubble", "0")
+            .add("msg", emoticonUnique)
+            .add("color", "16777215")
+            .add("mode", "1")
+            .add("dm_type", "1")
+            .add("emoticonOptions", "[object Object]")
+            .add("fontsize", "25")
+            .add("rnd", rnd)
+            .add("roomid", roomId.toString())
+            .add("csrf", csrf)
+            .add("csrf_token", csrf)
+            .build()
+        doSend(body, roomId)
     }
 }

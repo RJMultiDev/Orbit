@@ -62,7 +62,9 @@ fun WriteReplyScreen(
     visible: Boolean,
     targetName: String?,
     emotes: List<EmoteApi.EmotePackage>?,
+    isLive: Boolean = false,
     onSend: (String) -> Unit,
+    onSendEmote: (String) -> Unit = {},
     onClose: () -> Unit
 ) {
     var text by remember { mutableStateOf(TextFieldValue("")) }
@@ -248,7 +250,22 @@ fun WriteReplyScreen(
                                     if (text.text.isNotEmpty()) {
                                         isSending = true
                                         hideKeyboard()
-                                        onSend(EmoteMapper.decode(text.text))
+                                        if (isLive) {
+                                            val decoded = EmoteMapper.decode(text.text)
+                                            val hasPanelEmote = text.text.any { EmoteMapper.getNameForChar(it) != null }
+                                            val matchedEmote = if (hasPanelEmote) {
+                                                emotes
+                                                    ?.flatMap { it.emotes }
+                                                    ?.firstOrNull { it.name == decoded && it.emoticonUnique.isNotBlank() }
+                                            } else null
+                                            if (matchedEmote != null) {
+                                                onSendEmote(matchedEmote.emoticonUnique)
+                                            } else {
+                                                onSend(decoded)
+                                            }
+                                        } else {
+                                            onSend(EmoteMapper.decode(text.text))
+                                        }
                                         text = TextFieldValue("")
                                     }
                                 },
@@ -332,12 +349,16 @@ fun WriteReplyScreen(
                                                                     .height(40.dp)
                                                                     .clip(RoundedCornerShape(4.dp))
                                                                     .clickable {
-                                                                        val char = EmoteMapper.getCharForName(emote.name).toString()
-                                                                        val currentText = text.text
-                                                                        val selection = text.selection
-                                                                        val newText = currentText.substring(0, selection.min) + char + currentText.substring(selection.max)
-                                                                        val newCursor = selection.min + char.length
-                                                                        text = TextFieldValue(newText, TextRange(newCursor))
+                                                                        if (isLive && emote.emoticonUnique.isNotBlank()) {
+                                                                            onSendEmote(emote.emoticonUnique)
+                                                                        } else {
+                                                                            val char = EmoteMapper.getCharForName(emote.name).toString()
+                                                                            val currentText = text.text
+                                                                            val selection = text.selection
+                                                                            val newText = currentText.substring(0, selection.min) + char + currentText.substring(selection.max)
+                                                                            val newCursor = selection.min + char.length
+                                                                            text = TextFieldValue(newText, TextRange(newCursor))
+                                                                        }
                                                                     }
                                                                     .padding(4.dp),
                                                                 textAlign = TextAlign.Center
@@ -351,12 +372,16 @@ fun WriteReplyScreen(
                                                                     .size(40.dp)
                                                                     .clip(RoundedCornerShape(4.dp))
                                                                     .clickable {
-                                                                        val char = EmoteMapper.getCharForName(emote.name).toString()
-                                                                        val currentText = text.text
-                                                                        val selection = text.selection
-                                                                        val newText = currentText.substring(0, selection.min) + char + currentText.substring(selection.max)
-                                                                        val newCursor = selection.min + char.length
-                                                                        text = TextFieldValue(newText, TextRange(newCursor))
+                                                                        if (isLive && emote.emoticonUnique.isNotBlank()) {
+                                                                            onSendEmote(emote.emoticonUnique)
+                                                                        } else {
+                                                                            val char = EmoteMapper.getCharForName(emote.name).toString()
+                                                                            val currentText = text.text
+                                                                            val selection = text.selection
+                                                                            val newText = currentText.substring(0, selection.min) + char + currentText.substring(selection.max)
+                                                                            val newCursor = selection.min + char.length
+                                                                            text = TextFieldValue(newText, TextRange(newCursor))
+                                                                        }
                                                                     }
                                                                     .padding(4.dp)
                                                             )
