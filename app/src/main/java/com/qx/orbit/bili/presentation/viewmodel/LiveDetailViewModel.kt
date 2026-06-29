@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.qx.orbit.bili.data.api.EmoteApi
 import com.qx.orbit.bili.data.api.LiveApi
+import com.qx.orbit.bili.data.api.WbiSigner
 import com.qx.orbit.bili.data.model.LivePlayInfo
 import com.qx.orbit.bili.data.model.LiveRoom
 import com.qx.orbit.bili.data.remote.CookieManager
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -148,38 +150,78 @@ class LiveDetailViewModel : ViewModel() {
         }
     }
 
-    fun sendDanmaku(text: String, roomId: Long) {
+    fun sendDanmaku(text: String, roomId: Long, onResult: (Boolean, String) -> Unit = { _, _ -> }) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val csrf = CookieManager.getCsrf()
+                val rnd = (System.currentTimeMillis() / 1000).toString()
                 val body = okhttp3.FormBody.Builder()
                     .add("bubble", "0")
                     .add("msg", text)
                     .add("color", "16777215")
                     .add("mode", "1")
                     .add("room_type", "0")
+                    .add("jumpfrom", "0")
+                    .add("reply_mid", "0")
+                    .add("reply_attr", "0")
+                    .add("replay_dmid", "")
+                    .add("statistics", "{\"appId\":100,\"platform\":5}")
+                    .add("reply_type", "0")
+                    .add("reply_uname", "")
+                    .add("fontsize", "25")
+                    .add("rnd", rnd)
                     .add("roomid", roomId.toString())
                     .add("csrf", csrf)
                     .add("csrf_token", csrf)
                     .build()
+                val signedUrl = WbiSigner.signUrl("https://api.live.bilibili.com/msg/send?web_location=444.8")
                 val request = okhttp3.Request.Builder()
-                    .url("https://api.live.bilibili.com/msg/send")
+                    .url(signedUrl)
                     .post(body)
                     .addHeader("Cookie", CookieManager.getCookie())
                     .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.95 Safari/537.36")
                     .addHeader("Referer", "https://live.bilibili.com/$roomId")
                     .build()
-                com.qx.orbit.bili.data.remote.HttpClient.client.newCall(request).execute()
+                val response = com.qx.orbit.bili.data.remote.HttpClient.client.newCall(request).execute()
+                val respBody = response.body?.string().orEmpty()
+                response.close()
+                val code = Regex("\"code\"\\s*:\\s*(\\d+)").find(respBody)?.groupValues?.get(1)?.toIntOrNull() ?: -1
+                val msg = Regex("\"message\"\\s*:\\s*\"([^\"]*)\"").find(respBody)?.groupValues?.get(1).orEmpty()
+                val ok = code == 0
+                withContext(Dispatchers.Main) { onResult(ok, msg) }
             } catch (e: Exception) {
                 Log.e("LiveDetail", "Send danmaku error: ${e.message}")
+                withContext(Dispatchers.Main) { onResult(false, e.message ?: "unknown") }
             }
         }
     }
 
-    fun loadEmotes() {
+    fun loadEmotes(roomId: Long) {
         if (_emotes.value != null) return
         viewModelScope.launch {
-            try { _emotes.value = EmoteApi.getEmotes(EmoteApi.BUSINESS_REPLY) } catch (_: Exception) {}
+            try {
+                val pkgs = LiveApi.getLiveEmoticons(roomId = roomId)
+                _emotes.value = pkgs.map { pkg ->
+                    EmoteApi.EmotePackage(
+                        id = pkg.pkgId,
+                        text = pkg.pkgName,
+                        url = pkg.currentCover,
+                        type = pkg.pkgType,
+                        attr = pkg.pkgPerm,
+                        emotes = pkg.emoticons.map { e ->
+                            EmoteApi.Emote(
+                                id = e.emoticonId.toInt(),
+                                packageId = pkg.pkgId,
+                                name = "[${e.emoji}]",
+                                url = e.url,
+                                meta = EmoteApi.Emote.EmoteMeta(
+                                    size = if (e.width > 0) e.height / e.width else 1
+                                )
+                            )
+                        }
+                    )
+                }
+            } catch (_: Exception) {}
         }
     }
 

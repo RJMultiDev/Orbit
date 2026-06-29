@@ -58,9 +58,9 @@ private val TextPrimary = Color(0xFFEEEEEE)
 private val TextSecondary = Color(0xFFAAAAAA)
 
 /**
- * 统一登录页：Web 扫码 | HD 扫码 | Cookie 导入
+ * 统一登录页：HD 扫码 | Cookie 导入
  *
- * 三页横向滑动(无底部指示器),每页保持原本的 BiliPink 居中布局。
+ * 横向滑动(无底部指示器),每页保持原本的 BiliPink 居中布局。
  * 任一种方式登录成功后回调 onLoginSuccess 并自动返回。
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -75,12 +75,14 @@ fun LoginScreen(
     val hdState by hdLoginViewModel.uiState.collectAsState()
     val useHdQrCode = remember { SharedPreferencesUtil.getBoolean("use_hd_qr_code", true) }
 
+    /*
     LaunchedEffect(webState) {
         // Nothing here anymore, handled by SuccessContent
     }
     LaunchedEffect(hdState.status) {
         // Nothing here anymore, handled by SuccessContent
     }
+     */
 
     val pagerState = rememberPagerState(pageCount = { 2 })
 

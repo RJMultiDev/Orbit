@@ -184,4 +184,63 @@ object LiveApi {
             is Result.Error -> null
         }
     }
+
+    data class EmoticonPanelData(
+        @SerializedName("data") val packages: List<LiveEmoticonPackage>? = null,
+        @SerializedName("fans_brand") val fansBrand: Int = 0,
+        @SerializedName("purchase_url") val purchaseUrl: String? = null
+    )
+
+    data class LiveEmoticonPackage(
+        @SerializedName("pkg_id") val pkgId: Int = 0,
+        @SerializedName("pkg_name") val pkgName: String = "",
+        @SerializedName("pkg_type") val pkgType: Int = 0,
+        @SerializedName("pkg_perm") val pkgPerm: Int = 0,
+        @SerializedName("current_cover") val currentCover: String = "",
+        @SerializedName("pkg_descript") val pkgDescript: String = "",
+        @SerializedName("top_show") val topShow: LiveEmoticonTopShow? = null,
+        @SerializedName("top_show_recent") val topShowRecent: LiveEmoticonTopShow? = null,
+        @SerializedName("unlock_identity") val unlockIdentity: Int = 0,
+        @SerializedName("unlock_need_gift") val unlockNeedGift: Int = 0,
+        @SerializedName("emoticons") val emoticons: List<LiveEmoticon> = emptyList(),
+        @SerializedName("recently_used_emoticons") val recentlyUsed: List<LiveEmoticon> = emptyList()
+    )
+
+    data class LiveEmoticonTopShow(
+        @SerializedName("image") val image: String = "",
+        @SerializedName("text") val text: String = ""
+    )
+
+    data class LiveEmoticon(
+        @SerializedName("bulge_display") val bulgeDisplay: Int = 0,
+        @SerializedName("descript") val descript: String = "",
+        @SerializedName("emoji") val emoji: String = "",
+        @SerializedName("emoticon_id") val emoticonId: Long = 0,
+        @SerializedName("emoticon_unique") val emoticonUnique: String = "",
+        @SerializedName("emoticon_value_type") val emoticonValueType: Int = 0,
+        @SerializedName("height") val height: Int = 0,
+        @SerializedName("identity") val identity: Int = 0,
+        @SerializedName("in_player_area") val inPlayerArea: Int = 0,
+        @SerializedName("is_dynamic") val isDynamic: Int = 0,
+        @SerializedName("perm") val perm: Int = 0,
+        @SerializedName("unlock_need_gift") val unlockNeedGift: Int = 0,
+        @SerializedName("unlock_need_level") val unlockNeedLevel: Int = 0,
+        @SerializedName("unlock_show_color") val unlockShowColor: String = "",
+        @SerializedName("unlock_show_image") val unlockShowImage: String = "",
+        @SerializedName("unlock_show_text") val unlockShowText: String = "",
+        @SerializedName("url") val url: String = "",
+        @SerializedName("width") val width: Int = 0
+    )
+
+    suspend fun getLiveEmoticons(roomId: Long, platform: String = "android"): List<LiveEmoticonPackage> = withContext(Dispatchers.IO) {
+        when (val resp = api.getLiveEmoticons(platform, roomId)) {
+            is Result.Success -> {
+                val type = object : TypeToken<ApiResponse<EmoticonPanelData>>() {}.type
+                val parsed: ApiResponse<EmoticonPanelData>? = GsonConfig.gson.fromJson(resp.data, type)
+                if (parsed == null || !parsed.isSuccess) return@withContext emptyList()
+                parsed?.data?.packages ?: emptyList()
+            }
+            is Result.Error -> emptyList()
+        }
+    }
 }
