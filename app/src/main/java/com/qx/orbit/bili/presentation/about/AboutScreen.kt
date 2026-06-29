@@ -155,7 +155,7 @@ fun AboutScreen(navController: NavController) {
 
             val developers = listOf(
                 Triple("琴弦上的小医生", R.drawable.qinxian, "开发者") ,
-                Triple("RJ", R.drawable.akari, "贡献者")
+                Triple("iamRJ", R.drawable.iam_rj, "贡献者")
             )
 
             items(developers) { (name, iconRes, desc) ->
