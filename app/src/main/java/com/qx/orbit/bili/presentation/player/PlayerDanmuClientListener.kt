@@ -20,7 +20,16 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.Inflater
 
 interface PlayerCallback {
-    fun addDanmaku(text: String, color: Int, textSize: Int = 25, type: Int = 1, borderColor: Int = 0, senderName: String = "")
+    fun addDanmaku(
+        text: String,
+        color: Int,
+        textSize: Int = 25,
+        type: Int = 1,
+        borderColor: Int = 0,
+        senderName: String = "",
+        emotes: Map<String, com.qx.orbit.bili.presentation.viewmodel.EmoteInline>? = null,
+        singleEmote: com.qx.orbit.bili.presentation.viewmodel.EmoteInline? = null
+    )
     var onlineNumber: String
     fun updateTitle(title: String)
 }
@@ -167,15 +176,50 @@ class PlayerDanmuClientListener(
                 val message = info.optString(1, "")
                 if (message.isEmpty()) return
 
+                val first = info.optJSONArray(0)
+                val extraJson = try {
+                    first?.optJSONObject(15)?.optString("extra")
+                } catch (_: Exception) { null }
+                val extraObj = try {
+                    extraJson?.let { JSONObject(it) }
+                } catch (_: Exception) { null }
+
                 val senderName = try {
-                    info.optJSONArray(0)?.optJSONObject(15)
+                    first?.optJSONObject(15)
                         ?.optJSONObject("user")
                         ?.optJSONObject("base")
                         ?.optString("name", "") ?: ""
                 } catch (_: Exception) { "" }
 
+                val singleEmote = try {
+                    first?.optJSONObject(13)?.let { emoteObj ->
+                        val url = emoteObj.optString("url", "")
+                        val width = emoteObj.optInt("width", 0)
+                        val height = emoteObj.optInt("height", 0)
+                        if (url.isNotBlank() && width > 0 && height > 0) {
+                            com.qx.orbit.bili.presentation.viewmodel.EmoteInline(url, width, height)
+                        } else null
+                    }
+                } catch (_: Exception) { null }
+
+                val emotes = try {
+                    extraObj?.optJSONObject("emots")?.let { emotsObj ->
+                        val map = mutableMapOf<String, com.qx.orbit.bili.presentation.viewmodel.EmoteInline>()
+                        emotsObj.keys().forEach { key ->
+                            val emote = emotsObj.optJSONObject(key) ?: return@forEach
+                            val url = emote.optString("url", "")
+                            val width = emote.optInt("width", 0)
+                            val height = emote.optInt("height", 0)
+                            if (url.isNotBlank() && width > 0 && height > 0) {
+                                map[key] = com.qx.orbit.bili.presentation.viewmodel.EmoteInline(url, width, height)
+                            }
+                        }
+                        map.takeIf { it.isNotEmpty() }
+                    }
+                } catch (_: Exception) { null }
+
                 val displayText = if (senderName.isNotEmpty()) "$senderName：$message" else message
-                callback.addDanmaku(displayText, 0xFFFFFF, senderName = senderName)
+                callback.addDanmaku(displayText, 0xFFFFFF, senderName = senderName, emotes = emotes, singleEmote = singleEmote)
             }
             cmd == "WATCHED_CHANGE" -> {
                 val data = json.optJSONObject("data")

@@ -59,7 +59,7 @@ class HdQrCodeLoginViewModel : ViewModel() {
             try {
                 when (val result = LoginApi.getTvAuthCode()) {
                     is Result.Success -> {
-                        val data = GsonConfig.gson.fromJson(result.data, TvQrCodeAuth::class.java)
+                        val data = GsonConfig.gson.fromJson(result.data.asJsonObject.get("data"), TvQrCodeAuth::class.java)
                         if (data == null || data.authCode.isBlank() || data.url.isBlank()) {
                             _uiState.value = HdQrCodeState(status = HdQrStatus.ERROR, error = "获取二维码失败")
                             return@launch
@@ -85,7 +85,7 @@ class HdQrCodeLoginViewModel : ViewModel() {
 
                 when (val result = LoginApi.pollTvQrCode(authCode)) {
                     is Result.Success -> {
-                        val poll = GsonConfig.gson.fromJson(result.data, TvQrCodePoll::class.java)
+                        val poll = GsonConfig.gson.fromJson(result.data.asJsonObject.get("data"), TvQrCodePoll::class.java)
                         if (poll != null && poll.tokenInfo != null) {
                             saveLoginResult(poll)
                             return@launch

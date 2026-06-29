@@ -30,7 +30,7 @@ import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TitleCard
-import com.qx.orbit.bili.presentation.component.WysTimeText
+import com.qx.orbit.bili.presentation.ui.components.WysTimeText
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
@@ -80,7 +80,7 @@ fun SettingsScreen(navController: NavController) {
                     Text(text = "设置")
                 }
             }
-            
+
             if (isLoggedIn) {
                 item {
                     Button(
@@ -122,7 +122,7 @@ fun SettingsScreen(navController: NavController) {
                     Text(text = "内置播放器设置", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            
+
             item {
                 Button(
                     onClick = { navController.navigate("settings_ui") },
@@ -142,7 +142,7 @@ fun SettingsScreen(navController: NavController) {
                     Text(text = "界面设置", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            
+
             item {
                 Button(
                     onClick = { navController.navigate("settings_preference") },
@@ -162,7 +162,7 @@ fun SettingsScreen(navController: NavController) {
                     Text(text = "偏好设置", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            
+
             item {
                 Button(
                     onClick = { /* TODO */ },
@@ -374,7 +374,7 @@ fun SettingTerminalPlayerScreen(navController: NavController) {
                     )
                 }
             }
-            
+
             item {
                 var maxLines by remember { mutableIntStateOf(SharedPreferencesUtil.getInt("player_danmaku_maxline", 0)) }
                 Button(
