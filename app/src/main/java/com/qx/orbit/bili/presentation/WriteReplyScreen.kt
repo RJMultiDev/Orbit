@@ -53,6 +53,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import kotlin.math.max
 
 @Composable
@@ -66,6 +67,7 @@ fun WriteReplyScreen(
     var text by remember { mutableStateOf(TextFieldValue("")) }
     var isSending by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var isFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(visible) {
@@ -174,6 +176,7 @@ fun WriteReplyScreen(
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                                 keyboardActions = KeyboardActions(
                                     onDone = {
+                                        keyboardController?.hide()
                                         focusManager.clearFocus()
                                     }
                                 ),
@@ -233,6 +236,8 @@ fun WriteReplyScreen(
                                 onClick = {
                                     if (text.text.isNotEmpty()) {
                                         isSending = true
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus()
                                         onSend(EmoteMapper.decode(text.text))
                                         text = TextFieldValue("")
                                     }
