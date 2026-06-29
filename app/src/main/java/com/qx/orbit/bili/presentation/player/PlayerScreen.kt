@@ -1,5 +1,6 @@
 package com.qx.orbit.bili.presentation.player
 
+import android.annotation.SuppressLint
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.widget.FrameLayout
@@ -12,19 +13,39 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,7 +59,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -51,20 +71,20 @@ import com.qx.orbit.bili.data.api.CookiesApi
 import com.qx.orbit.bili.data.api.DanmakuApi
 import com.qx.orbit.bili.data.api.HeartbeatApi
 import com.qx.orbit.bili.data.api.HistoryApi
+import com.qx.orbit.bili.data.api.LiveApi
 import com.qx.orbit.bili.data.api.PlayerApi
 import com.qx.orbit.bili.data.model.PlayerData
 import com.qx.orbit.bili.data.remote.CookieManager
-import com.qx.orbit.bili.data.api.LiveApi
 import com.qx.orbit.bili.util.SharedPreferencesUtil
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import master.flame.danmaku.danmaku.model.android.DanmakuContext
 import master.flame.danmaku.danmaku.parser.android.BiliProtobufDanmakuParser
 import master.flame.danmaku.ui.widget.DanmakuView
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(DelicateCoroutinesApi::class)
 @Composable
@@ -102,7 +122,7 @@ fun PlayerScreen(
         if (isLive && playerData.timeStamp > 0) {
             while (true) {
                 liveElapsedSeconds = (System.currentTimeMillis() / 1000) - playerData.timeStamp
-                kotlinx.coroutines.delay(1000)
+                delay(1.seconds)
             }
         }
     }
@@ -123,7 +143,7 @@ fun PlayerScreen(
 
     LaunchedEffect(interactionCounter) {
         showControls = true
-        delay(3000)
+        delay(3.seconds)
         showControls = false
     }
 
@@ -133,7 +153,7 @@ fun PlayerScreen(
         }
         while(isPlaying && isPrepared) {
             currentProgress = mediaPlayer.currentPosition
-            delay(1000)
+            delay(1.seconds)
         }
     }
 
@@ -144,7 +164,7 @@ fun PlayerScreen(
             } else {
                 var lastProgress = currentProgress
                 while (isLoading) {
-                    delay(1000)
+                    delay(1.seconds)
                     val current = mediaPlayer.currentPosition
                     val speed = (current - lastProgress) / 1000
                     bufferSpeed = if (speed > 0) {
@@ -312,11 +332,12 @@ fun PlayerScreen(
                     val mid = CookieManager.getMid()
 
                     val callback = object : PlayerCallback {
+                        @SuppressLint("LocalContextResourcesRead")
                         override fun addDanmaku(text: String, color: Int, textSize: Int, type: Int, borderColor: Int, senderName: String) {
                             try {
                                 val ctx = danmakuContext ?: return
                                 val item = ctx.mDanmakuFactory.createDanmaku(type) ?: return
-                                val showSender = com.qx.orbit.bili.util.SharedPreferencesUtil.getBoolean("player_danmaku_showsender", true)
+                                val showSender = SharedPreferencesUtil.getBoolean("player_danmaku_showsender", true)
                                 val displayText = if (!showSender && senderName.isNotEmpty()) {
                                     text.removePrefix("$senderName：")
                                 } else text
@@ -783,6 +804,7 @@ fun PlayerScreen(
     }
 }
 
+@SuppressLint("DefaultLocale")
 private fun formatTime(ms: Long): String {
     val totalSeconds = ms / 1000
     val m = totalSeconds / 60
