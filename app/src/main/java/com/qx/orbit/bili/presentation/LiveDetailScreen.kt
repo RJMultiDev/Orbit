@@ -197,11 +197,19 @@ fun LiveDetailScreen(
             visible = showWriteReply,
             targetName = null,
             emotes = emotes,
+            isLive = true,
             onSend = { text ->
                 viewModel.sendDanmaku(text, roomId) { ok, msg ->
                     if (ok) {
                         showWriteReply = false
                     } else {
+                        android.widget.Toast.makeText(context, "发送失败: $msg", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onSendEmote = { emoticonUnique ->
+                viewModel.sendLiveEmote(emoticonUnique, roomId) { ok, msg ->
+                    if (!ok) {
                         android.widget.Toast.makeText(context, "发送失败: $msg", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }

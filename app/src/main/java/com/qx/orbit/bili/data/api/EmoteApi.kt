@@ -18,6 +18,7 @@ object EmoteApi {
         @SerializedName("package_id") val packageId: Int = 0,
         @SerializedName("text") val name: String = "",
         @SerializedName("url") val url: String = "",
+        @SerializedName("emoticon_unique") val emoticonUnique: String = "",
         @SerializedName("meta") val meta: EmoteMeta? = null
     ) {
         data class EmoteMeta(

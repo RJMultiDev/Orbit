@@ -224,6 +224,46 @@ class LiveDetailViewModel : ViewModel() {
         }
     }
 
+    fun sendLiveEmote(emoticonUnique: String, roomId: Long, onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val csrf = CookieManager.getCsrf()
+                val rnd = (System.currentTimeMillis() / 1000).toString()
+                val body = okhttp3.FormBody.Builder()
+                    .add("bubble", "0")
+                    .add("msg", emoticonUnique)
+                    .add("color", "16777215")
+                    .add("mode", "1")
+                    .add("dm_type", "1")
+                    .add("emoticonOptions", "[object Object]")
+                    .add("fontsize", "25")
+                    .add("rnd", rnd)
+                    .add("roomid", roomId.toString())
+                    .add("csrf", csrf)
+                    .add("csrf_token", csrf)
+                    .build()
+                val signedUrl = WbiSigner.signUrl("https://api.live.bilibili.com/msg/send?web_location=444.8")
+                val request = okhttp3.Request.Builder()
+                    .url(signedUrl)
+                    .post(body)
+                    .addHeader("Cookie", CookieManager.getCookie())
+                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.95 Safari/537.36")
+                    .addHeader("Referer", "https://live.bilibili.com/$roomId")
+                    .build()
+                val response = com.qx.orbit.bili.data.remote.HttpClient.client.newCall(request).execute()
+                val respBody = response.body?.string().orEmpty()
+                response.close()
+                val code = Regex("\"code\"\\s*:\\s*(\\d+)").find(respBody)?.groupValues?.get(1)?.toIntOrNull() ?: -1
+                val msg = Regex("\"message\"\\s*:\\s*\"([^\"]*)\"").find(respBody)?.groupValues?.get(1).orEmpty()
+                val ok = code == 0
+                withContext(Dispatchers.Main) { onResult(ok, msg) }
+            } catch (e: Exception) {
+                Log.e("LiveDetail", "Send live emote error: ${e.message}")
+                withContext(Dispatchers.Main) { onResult(false, e.message ?: "unknown") }
+            }
+        }
+    }
+
     fun loadEmotes(roomId: Long) {
         if (_emotes.value != null) return
         viewModelScope.launch {
@@ -242,6 +282,7 @@ class LiveDetailViewModel : ViewModel() {
                                 packageId = pkg.pkgId,
                                 name = "[${e.emoji}]",
                                 url = e.url,
+                                emoticonUnique = e.emoticonUnique,
                                 meta = EmoteApi.Emote.EmoteMeta(
                                     size = if (e.width > 0) e.height / e.width else 1
                                 )
