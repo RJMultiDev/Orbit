@@ -8,6 +8,8 @@ import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.net.Uri
+import com.google.gson.JsonParser
 import okhttp3.FormBody
 import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -60,7 +62,7 @@ object DynamicApi {
 
     data class UpInfo(
         @SerializedName("mid") val mid: Long = 0,
-        @SerializedName("name") val name: String? = null,
+        @SerializedName("uname") val uname: String? = null,
         @SerializedName("face") val face: String? = null,
         @SerializedName("has_update") val has_update: Boolean = false
     )
@@ -113,7 +115,12 @@ object DynamicApi {
         @SerializedName("draw") val draw: DrawMajor? = null,
         @SerializedName("opus") val opus: OpusMajor? = null,
         @SerializedName("article") val article: ArticleMajor? = null,
-        @SerializedName("common") val common: CommonMajor? = null
+        @SerializedName("common") val common: CommonMajor? = null,
+        @SerializedName("live_rcmd") val live_rcmd: LiveRcmdMajor? = null
+    )
+
+    internal data class LiveRcmdMajor(
+        @SerializedName("content") val content: String? = null
     )
 
     internal data class ArchiveMajor(
@@ -322,6 +329,22 @@ object DynamicApi {
         resp?.data?.up_list ?: emptyList()
     }
 
+    suspend fun clearUpUpdate(mid: Long) = withContext(Dispatchers.IO) {
+        val csrf = CookieManager.getCsrf()
+        val jsonStr = "{\"up_mid\":\"$mid\",\"csrf\":\"$csrf\"}"
+        val body = jsonStr.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+        val request = Request.Builder()
+            .url("https://api.bilibili.com/x/polymer/web-dynamic/v1/up/view")
+            .post(body)
+            .addHeader("Cookie", CookieManager.getCookie())
+            .addHeader("User-Agent", USER_AGENT)
+            .addHeader("Referer", "https://www.bilibili.com/")
+            .build()
+        try {
+            HttpClient.client.newCall(request).execute().use { }
+        } catch (_: Exception) {}
+    }
+
     private fun analyzeDynamic(item: DynamicRawItem): Dynamic {
         val dynamicId = item.id_str ?: ""
         val dynType = item.type ?: ""
@@ -346,8 +369,8 @@ object DynamicApi {
         val members = mutableMapOf<String, Long>()
         parseRichTextNodes(dynContent?.desc?.rich_text_nodes, emotes, members)
 
-        val commentId: Long
-        val commentType: Int
+        var commentId = item.basic?.comment_id_str?.toLongOrNull() ?: 0L
+        var commentType = item.basic?.comment_type ?: 0
         val images = mutableListOf<String>()
         var cover = ""
         var bvid = ""
@@ -356,24 +379,22 @@ object DynamicApi {
         when (majorType) {
             "MAJOR_TYPE_ARCHIVE" -> {
                 val archive = majorObj?.archive
-                commentId = archive?.aid ?: 0
-                commentType = 1
+                if (commentId == 0L) commentId = archive?.aid ?: 0
+                if (commentType == 0) commentType = 1
                 archiveTitle = archive?.title ?: ""
                 cover = archive?.cover?.fixUrl() ?: ""
                 bvid = archive?.bvid ?: ""
                 if (content.isEmpty()) content = archiveTitle
             }
             "MAJOR_TYPE_DRAW" -> {
-                commentId = 0
-                commentType = 11
+                if (commentType == 0) commentType = 11
                 majorObj?.draw?.items?.forEach { drawItem ->
                     drawItem.src?.fixUrl()?.takeIf { it.isNotEmpty() }?.let { images.add(it) }
                 }
                 if (content.isEmpty()) majorObj?.draw?.desc?.takeIf { it.isNotEmpty() }?.let { content = it }
             }
             "MAJOR_TYPE_OPUS" -> {
-                commentId = 0
-                commentType = 11
+                if (commentType == 0) commentType = 11
                 majorObj?.opus?.pics?.forEach { pic ->
                     pic.url?.fixUrl()?.takeIf { it.isNotEmpty() }?.let { images.add(it) }
                 }
@@ -384,23 +405,40 @@ object DynamicApi {
                 if (content.isEmpty()) content = summaryText.ifEmpty { opusTitle }
             }
             "MAJOR_TYPE_ARTICLE" -> {
-                commentId = majorObj?.article?.id ?: 0
-                commentType = 12
+                if (commentId == 0L) commentId = majorObj?.article?.id ?: 0
+                if (commentType == 0) commentType = 12
                 val title = majorObj?.article?.title ?: ""
                 if (content.isEmpty()) content = title
             }
             "MAJOR_TYPE_LIVE_RCMD" -> {
-                commentId = 0
-                commentType = 17
+                if (commentType == 0) commentType = 17
+                majorObj?.live_rcmd?.content?.let { jsonStr ->
+                    try {
+                        val obj = JsonParser.parseString(jsonStr).asJsonObject
+                        val livePlayInfo = obj.getAsJsonObject("live_play_info")
+                        if (livePlayInfo != null) {
+                            val title = livePlayInfo.get("title")?.asString ?: ""
+                            val cov = livePlayInfo.get("cover")?.asString ?: ""
+                            if (content.isEmpty()) content = title
+                            cover = cov.fixUrl()
+                            val link = livePlayInfo.get("link")?.asString ?: ""
+                            val uriObj = Uri.parse(link)
+                            val roomId = uriObj.pathSegments?.lastOrNull() ?: ""
+                            bvid = roomId
+                            if (archiveTitle.isEmpty()) archiveTitle = title
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
             }
             "MAJOR_TYPE_COMMON" -> {
-                commentId = 0
-                commentType = 17
+                if (commentType == 0) commentType = 17
                 if (content.isEmpty()) content = majorObj?.common?.title ?: ""
             }
             else -> {
-                commentId = dynamicId.toLongOrNull() ?: 0L
-                commentType = 17
+                if (commentId == 0L) commentId = dynamicId.toLongOrNull() ?: 0L
+                if (commentType == 0) commentType = 17
             }
         }
 

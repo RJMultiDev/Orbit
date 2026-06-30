@@ -27,10 +27,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -290,7 +293,16 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        RecommendScreen(
+        if (currentTab == TabMode.DYNAMIC) {
+            val dynamicViewModel: com.qx.orbit.bili.presentation.viewmodel.DynamicFeedViewModel = viewModel()
+            DynamicFeedScreen(
+                viewModel = dynamicViewModel,
+                focusRequester = focusRequester,
+                navController = navController,
+                onTabClick = { showTabMenu = true }
+            )
+        } else {
+            RecommendScreen(
                 currentTab = currentTab,
                 videoList = videoList,
                 isLoading = isLoading,
@@ -300,6 +312,7 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
                 onLoadMore = { viewModel.loadMore() },
                 onTabClick = { showTabMenu = true }
             )
+        }
 
             AnimatedVisibility(
                 visible = showTabMenu,
@@ -468,10 +481,28 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
                                         ),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        if (tab == TabMode.RECOMMEND) {
-                                            Icon(imageVector = Icons.Default.Favorite, modifier = Modifier.size(20.dp), contentDescription = tab.title)
-                                        } else {
-                                            Icon(imageVector = Icons.Default.Star, modifier = Modifier.size(20.dp), contentDescription = tab.title)
+                                        when (tab) {
+                                            TabMode.RECOMMEND -> {
+                                                Icon(
+                                                    imageVector = Icons.Default.Favorite,
+                                                    modifier = Modifier.size(20.dp),
+                                                    contentDescription = tab.title
+                                                )
+                                            }
+                                            TabMode.POPULAR -> {
+                                                Icon(
+                                                    imageVector = Icons.Default.Star,
+                                                    modifier = Modifier.size(20.dp),
+                                                    contentDescription = tab.title
+                                                )
+                                            }
+                                            else -> {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.Article,
+                                                    modifier = Modifier.size(20.dp),
+                                                    contentDescription = tab.title
+                                                )
+                                            }
                                         }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(tab.title)

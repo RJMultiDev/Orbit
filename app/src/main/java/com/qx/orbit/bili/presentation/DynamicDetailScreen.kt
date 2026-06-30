@@ -3,9 +3,7 @@ package com.qx.orbit.bili.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
@@ -29,7 +27,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
-import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
@@ -40,14 +37,17 @@ import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.qx.orbit.bili.data.model.VideoCard
+import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
 import com.qx.orbit.bili.R
-import com.qx.orbit.bili.data.model.Dynamic
-import com.qx.orbit.bili.data.model.Reply
 import com.qx.orbit.bili.presentation.theme.BiliPink
 import com.qx.orbit.bili.presentation.viewmodel.DynamicDetailViewModel
 import com.qx.orbit.bili.util.formatCount
 import androidx.compose.ui.text.style.TextAlign
-import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.TextUnit
+import com.qx.orbit.bili.presentation.ui.components.ImageViewerDialog
+import com.qx.orbit.bili.presentation.ui.components.ReplyCard
+import com.qx.orbit.bili.presentation.util.parseRichText
 
 @Composable
 fun DynamicDetailScreen(
@@ -107,9 +107,17 @@ fun DynamicDetailScreen(
                     contentPadding = contentPadding
                 ) {
                     item {
+                        ListHeader(
+                            modifier = Modifier.transformedHeight(this, transformationSpec),
+                            transformation = SurfaceTransformation(transformationSpec)
+                        ) { Text("动态详情", color = MaterialTheme.colorScheme.primary) }
+                    }
+                    
+                    item {
                         Card(
                             onClick = {},
                             modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
+                            transformation = SurfaceTransformation(transformationSpec),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
@@ -136,7 +144,11 @@ fun DynamicDetailScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = if (item.major_type == "MAJOR_TYPE_ARCHIVE") "投稿了视频" else "发布了动态",
+                                            text = when (item.major_type) {
+                                                "MAJOR_TYPE_ARCHIVE" -> "投稿了视频"
+                                                "MAJOR_TYPE_LIVE_RCMD" -> "直播了"
+                                                else -> "发布了动态"
+                                            },
                                             fontSize = 11.sp,
                                             color = Color.Gray,
                                             maxLines = 1
@@ -156,12 +168,17 @@ fun DynamicDetailScreen(
                                 }
 
                                 if (item.content.isNotEmpty() && item.content != item.archiveTitle) {
-                                    val (richText, inlineContent) = parseRichText(item.content, item.emotes, item.members, emptyMap())
+                                    val (richText, inlineContent) = parseRichText(
+                                        item.content,
+                                        item.emotes,
+                                        item.members,
+                                        emptyMap()
+                                    )
                                     val textLayoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
                                     Text(
                                         text = richText,
                                         inlineContent = inlineContent,
-                                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified),
+                                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = TextUnit.Unspecified),
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.padding(bottom = 8.dp).pointerInput(Unit) {
                                             detectTapGestures { offset ->
@@ -194,35 +211,40 @@ fun DynamicDetailScreen(
                                 }
 
                                 if (item.major_type == "MAJOR_TYPE_ARCHIVE" && item.cover.isNotEmpty()) {
-                                    val fixedUrl = when {
-                                        item.cover.startsWith("//") -> "https:${item.cover}"
-                                        item.cover.startsWith("http://") -> item.cover.replaceFirst("http://", "https://")
-                                        else -> item.cover
-                                    }
-                                    val finalUrl = if (!fixedUrl.contains("@")) "$fixedUrl@480w_270h_1c.webp" else fixedUrl
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).background(Color.DarkGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).clickable {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    RecommendVideoCard(
+                                        item = VideoCard(
+                                            title = item.archiveTitle,
+                                            cover = item.cover,
+                                            upName = item.userInfo?.name ?: "",
+                                            view = "视频"
+                                        ),
+                                        onClick = {
                                             if (item.bvid.isNotEmpty() || item.comment_id > 0) {
                                                 navController.navigate("detail/${item.bvid}/${item.comment_id}")
                                             }
-                                        }.padding(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context).data(finalUrl).crossfade(true).build(),
-                                            contentDescription = null,
-                                            modifier = Modifier.width(80.dp).height(50.dp).clip(RoundedCornerShape(4.dp)),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = item.archiveTitle,
-                                            fontSize = 12.sp,
-                                            color = Color.LightGray,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+
+                                if (item.major_type == "MAJOR_TYPE_LIVE_RCMD" && item.cover.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    RecommendVideoCard(
+                                        item = VideoCard(
+                                            title = item.content,
+                                            cover = item.cover,
+                                            upName = item.userInfo?.name ?: "",
+                                            view = "直播中"
+                                        ),
+                                        onClick = {
+                                            val roomId = item.archiveTitle.toLongOrNull() ?: 0L
+                                            if (roomId > 0) {
+                                                navController.navigate("live_room/$roomId")
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                                 }
 
                                 item.dynamic_forward?.let { forward ->
@@ -248,7 +270,12 @@ fun DynamicDetailScreen(
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         if (forward.content.isNotEmpty() && forward.content != forward.archiveTitle) {
-                                            val (fwdRichText, fwdInlineContent) = parseRichText(forward.content, forward.emotes, forward.members, emptyMap())
+                                            val (fwdRichText, fwdInlineContent) = parseRichText(
+                                                forward.content,
+                                                forward.emotes,
+                                                forward.members,
+                                                emptyMap()
+                                            )
                                             Text(
                                                 text = fwdRichText,
                                                 inlineContent = fwdInlineContent,
@@ -261,28 +288,20 @@ fun DynamicDetailScreen(
                                         }
                                         if (forward.major_type == "MAJOR_TYPE_ARCHIVE" && forward.cover.isNotEmpty()) {
                                             Spacer(modifier = Modifier.height(6.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                val fwdCoverUrl = when {
-                                                    forward.cover.startsWith("//") -> "https:${forward.cover}"
-                                                    forward.cover.startsWith("http://") -> forward.cover.replaceFirst("http://", "https://")
-                                                    else -> forward.cover
-                                                }
-                                                val fwdFinalUrl = if (!fwdCoverUrl.contains("@")) "$fwdCoverUrl@240w_135h_1c.webp" else fwdCoverUrl
-                                                AsyncImage(
-                                                    model = ImageRequest.Builder(context).data(fwdFinalUrl).crossfade(true).build(),
-                                                    contentDescription = null,
-                                                    modifier = Modifier.width(60.dp).height(36.dp).clip(RoundedCornerShape(4.dp)),
-                                                    contentScale = ContentScale.Crop
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = forward.archiveTitle,
-                                                    fontSize = 11.sp,
-                                                    color = Color.LightGray,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
+                                            RecommendVideoCard(
+                                                item = VideoCard(
+                                                    title = forward.archiveTitle,
+                                                    cover = forward.cover,
+                                                    upName = forward.userInfo?.name ?: "",
+                                                    view = "视频"
+                                                ),
+                                                onClick = {
+                                                    if (forward.bvid.isNotEmpty() || forward.comment_id > 0) {
+                                                        navController.navigate("detail/${forward.bvid}/${forward.comment_id}")
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
                                         }
                                         if (forward.images.isNotEmpty()) {
                                             Spacer(modifier = Modifier.height(6.dp))
@@ -387,10 +406,7 @@ fun DynamicDetailScreen(
                     }
 
                     if (replies.isNotEmpty()) {
-                        item {
-                            ListHeader { Text("评论区") }
-                        }
-                        
+
                         items(replies.size) { index ->
                             if (index == replies.size - 3) {
                                 LaunchedEffect(index) { viewModel.loadReplies() }

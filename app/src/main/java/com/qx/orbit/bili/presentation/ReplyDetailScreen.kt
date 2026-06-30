@@ -25,6 +25,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
 import com.qx.orbit.bili.data.model.Reply
+import com.qx.orbit.bili.presentation.ui.components.ReplyCard
 import com.qx.orbit.bili.presentation.viewmodel.ReplyDetailViewModel
 import com.qx.orbit.bili.presentation.ui.components.WysTimeText
 
@@ -79,6 +80,8 @@ fun ReplyDetailScreen(
                         transformation = SurfaceTransformation(transformationSpec),
                         modifier = Modifier.transformedHeight(this, transformationSpec),
                         navController = navController,
+                        showReplyPreview = false,
+                        isDetail = true,
                         onLikeClick = { viewModel.likeRootReply(root.liked) },
                         onReplyClick = { 
                             replyTarget = root
@@ -112,6 +115,7 @@ fun ReplyDetailScreen(
                         transformation = SurfaceTransformation(transformationSpec),
                         modifier = Modifier.transformedHeight(this, transformationSpec),
                         navController = navController,
+                        showReplyPreview = false,
                         onLikeClick = { viewModel.likeChildReply(childReplies[index].rpid, childReplies[index].liked) },
                         onReplyClick = { 
                             replyTarget = childReplies[index]

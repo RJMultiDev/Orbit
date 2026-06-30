@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 
 enum class TabMode(val title: String) {
     RECOMMEND("推荐"),
-    POPULAR("热门")
+    POPULAR("热门"),
+    DYNAMIC("动态")
 }
 
 class MainViewModel : ViewModel() {
@@ -85,6 +86,7 @@ class MainViewModel : ViewModel() {
                 val newItems = when (_currentTab.value) {
                     TabMode.RECOMMEND -> RecommendApi.getRecommend(recommendPage++)
                     TabMode.POPULAR -> RecommendApi.getPopular(popularPage++)
+                    TabMode.DYNAMIC -> emptyList()
                 }
 
                 _videoList.value = if (reset) {

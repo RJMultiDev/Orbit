@@ -1,28 +1,27 @@
 package com.qx.orbit.bili.presentation
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
-import com.qx.orbit.bili.presentation.ui.components.UserAvatar
-import com.qx.orbit.bili.presentation.ui.components.UserNameText
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -30,49 +29,30 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.offset
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.AccessTimeFilled
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.PlayCircleOutline
-import androidx.compose.runtime.mutableIntStateOf
-import com.qx.orbit.bili.data.api.UserInfoApi
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,6 +64,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
@@ -92,11 +73,13 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
@@ -126,25 +109,29 @@ import coil.request.ImageRequest
 import com.google.gson.Gson
 import com.qx.orbit.bili.R
 import com.qx.orbit.bili.data.api.BilibiliIDConverter
+import com.qx.orbit.bili.data.api.UserInfoApi
 import com.qx.orbit.bili.data.model.Emote
 import com.qx.orbit.bili.data.model.PlayerData
 import com.qx.orbit.bili.data.model.Reply
 import com.qx.orbit.bili.data.model.VideoCard
 import com.qx.orbit.bili.data.model.VideoInfo
-import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
+import com.qx.orbit.bili.presentation.theme.BiliPink
 import com.qx.orbit.bili.presentation.ui.components.LevelIcon
+import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
+import com.qx.orbit.bili.presentation.ui.components.ReplyCard
+import com.qx.orbit.bili.presentation.ui.components.RoundToast
+import com.qx.orbit.bili.presentation.ui.components.UserAvatar
+import com.qx.orbit.bili.presentation.ui.components.UserNameText
 import com.qx.orbit.bili.presentation.viewmodel.VideoDetailViewModel
 import com.qx.orbit.bili.util.LinkResolver
 import com.qx.orbit.bili.util.SharedPreferencesUtil
 import com.qx.orbit.bili.util.formatCount
-import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import androidx.core.net.toUri
-import com.qx.orbit.bili.presentation.theme.BiliPink
-import com.qx.orbit.bili.presentation.ui.components.RoundToast
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -919,194 +906,6 @@ fun VideoCommentsPage(
 }
 
 @Composable
-fun ReplyCard(
-    reply: Reply,
-    modifier: Modifier = Modifier,
-    transformation: SurfaceTransformation,
-    navController: NavHostController,
-    onClick: () -> Unit = {},
-    onLikeClick: () -> Unit = {},
-    onReplyClick: () -> Unit = {}
-) {
-    val context = LocalContext.current
-    var linkClicked by remember { mutableStateOf(false) }
-    var resolvedB23Links by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var showImageDialog by remember { mutableStateOf<String?>(null) }
-    
-    showImageDialog?.let { url ->
-        ImageViewerDialog(imageUrl = url, onDismiss = { showImageDialog = null })
-    }
-    
-    LaunchedEffect(reply.message) {
-        val b23Pattern = Regex("https?://b23\\.tv/\\S+", RegexOption.IGNORE_CASE)
-        val b23Links = b23Pattern.findAll(reply.message).map { it.value }.toList()
-        if (b23Links.isNotEmpty()) {
-            val resolved = mutableMapOf<String, String>()
-            for (link in b23Links) {
-                withContext(Dispatchers.IO) {
-                    LinkResolver.resolveB23Link(link)?.let { bv ->
-                        resolved[link] = bv
-                    }
-                }
-            }
-            resolvedB23Links = resolved
-        }
-    }
-    Card(
-        onClick = { if (!linkClicked) onClick() else linkClicked = false },
-        modifier = modifier.fillMaxWidth(),
-        transformation = transformation,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    ) {
-        Column(modifier = Modifier) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { 
-                    reply.sender?.mid?.let { mid ->
-                        navController.navigate("user_space/$mid")
-                    }
-                }
-            ) {
-                UserAvatar(
-                    avatarUrl = reply.sender?.avatar ?: "",
-                    officialRole = reply.sender?.official ?: 0,
-                    modifier = Modifier.size(24.dp),
-                    isVip = (reply.sender?.vip_role ?: 0) > 0
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                UserNameText(
-                    name = reply.sender?.name ?: "",
-                    isVip = (reply.sender?.vip_role ?: 0) > 0,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                LevelIcon(
-                    level = reply.sender?.level ?: 0,
-                    isSenior = (reply.sender?.is_senior_member ?: 0) == 1
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            val (richText, inlineContent) = parseRichText(reply.message, reply.emotes, reply.members, resolvedB23Links)
-            val textLayoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
-            Text(
-                text = richText,
-                inlineContent = inlineContent,
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.pointerInput(Unit) {
-                    detectTapGestures { offset ->
-                        val pos = textLayoutResult.value?.getOffsetForPosition(offset) ?: -1
-                        if (pos >= 0) {
-                            richText.getStringAnnotations(tag = "URL", start = pos, end = pos).firstOrNull()?.let { annotation ->
-                                linkClicked = true
-                                val url = annotation.item.removePrefix("url:")
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, url.toUri())
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {}
-                            }
-                            richText.getStringAnnotations(tag = "VIDEO", start = pos, end = pos).firstOrNull()?.let { annotation ->
-                                linkClicked = true
-                                val videoId = annotation.item.removePrefix("video:")
-                                val aid = if (videoId.startsWith("av", ignoreCase = true)) videoId.removePrefix("av").toLongOrNull() ?: 0L else 0L
-                                val bvid = if (videoId.startsWith("bv", ignoreCase = true)) videoId else BilibiliIDConverter.aidToBv(aid)
-                                if (aid > 0 || bvid.isNotEmpty()) {
-                                    navController.navigate("detail/$bvid/$aid")
-                                }
-                            }
-                            richText.getStringAnnotations(tag = "USER", start = pos, end = pos).firstOrNull()?.let { annotation ->
-                                linkClicked = true
-                                val mid = annotation.item.toLongOrNull() ?: 0L
-                                if (mid > 0) {
-                                    navController.navigate("user_space/$mid")
-                                }
-                            }
-                        }
-                    }
-                },
-                onTextLayout = { textLayoutResult.value = it }
-            )
-            if (reply.pictureList.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                    val isSingle = reply.pictureList.size == 1
-                    reply.pictureList.forEach { url ->
-                        val fixedUrl = when {
-                            url.startsWith("//") -> "https:$url"
-                            url.startsWith("http://") -> url.replaceFirst("http://", "https://")
-                            else -> url
-                        }
-                        AsyncImage(
-                            model = fixedUrl,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .height(80.dp)
-                                .then(if (isSingle) Modifier else Modifier.width(80.dp))
-                                .padding(end = 4.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .clickable { showImageDialog = fixedUrl },
-                            contentScale = if (isSingle) ContentScale.Fit else ContentScale.Crop
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = reply.pubTime,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 10.sp,
-                modifier = Modifier.fillMaxWidth().padding(end = 4.dp, bottom = 4.dp),
-                textAlign = TextAlign.End
-            )
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                // Like Button
-                val activeColor = BiliPink
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onLikeClick() }.padding(4.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.icon_like_0),
-                        contentDescription = "Like",
-                        modifier = Modifier.size(14.dp),
-                        tint = if (reply.liked) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (reply.likeCount > 0) "${reply.likeCount}" else "点赞",
-                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                        color = if (reply.liked) activeColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp
-                    )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                // Reply Button
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onReplyClick() }.padding(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = "Reply",
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "回复(${reply.childCount})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun VideoRelatedPage(
     relatedVideos: List<VideoCard>, 
     focusRequester: FocusRequester,
@@ -1141,141 +940,6 @@ fun VideoRelatedPage(
                     transformation = SurfaceTransformation(transformationSpec)
                 )
             }
-        }
-    }
-}
-
-@Composable
-fun parseRichText(
-    text: String,
-    emotes: Map<String, Emote>,
-    members: Map<String, Long> = emptyMap(),
-    resolvedB23Links: Map<String, String> = emptyMap()
-): Pair<AnnotatedString, Map<String, InlineTextContent>> {
-    val inlineContentMap = mutableMapOf<String, InlineTextContent>()
-    
-    var processedText = text
-        .replace("<br>", "\n")
-        .replace("<br/>", "\n")
-        .replace("<br />", "\n")
-        .replace(Regex("<[^>]+>"), "")
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&apos;", "'")
-    
-    for ((b23Link, bv) in resolvedB23Links) {
-        processedText = processedText.replace(b23Link, bv)
-    }
-    
-    val urlPattern = "(https?://[^\\s<>()\\[\\]\"',;!?]+|www\\.[^\\s<>()\\[\\]\"',;!?]+)"
-    val videoPattern = "(?i)(bv[A-Za-z0-9]+|av\\d+)"
-    val fullPattern = Regex("($urlPattern|$videoPattern)")
-    
-    val annotatedString = buildAnnotatedString {
-        if (emotes.isEmpty() && members.isEmpty() && !processedText.contains(fullPattern)) {
-            append(processedText)
-            return@buildAnnotatedString
-        }
-        
-        val parts = processedText.split(fullPattern)
-        val matches = fullPattern.findAll(processedText).toList()
-        
-        for (i in parts.indices) {
-            val part = parts[i]
-            if (part.isNotEmpty()) {
-                if (emotes.isNotEmpty() || members.isNotEmpty()) {
-                    val tokenPattern = Regex("\\[[^]]+]|@([\\w\\u4e00-\\u9fa5_-]+)")
-                    var lastIdx = 0
-                    for (match in tokenPattern.findAll(part)) {
-                        val token = match.value
-                        
-                        if (token.startsWith("[")) {
-                            // Emote
-                            val emote = emotes[token]
-                            if (emote != null) {
-                                append(part.substring(lastIdx, match.range.first))
-                                appendInlineContent(token, token)
-                                if (!inlineContentMap.containsKey(token)) {
-                                    val sizeSp = (emote.size * 18).sp
-                                    inlineContentMap[token] = InlineTextContent(
-                                        Placeholder(
-                                            width = sizeSp,
-                                            height = sizeSp,
-                                            placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
-                                        )
-                                    ) {
-                                        AsyncImage(
-                                            model = emote.url,
-                                            contentDescription = emote.name,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-                                }
-                                lastIdx = match.range.last + 1
-                            }
-                        } else if (token.startsWith("@")) {
-                            // Mention
-                            val name = match.groupValues[1]
-                            val mid = members[name]
-                            if (mid != null) {
-                                append(part.substring(lastIdx, match.range.first))
-                                pushStringAnnotation(tag = "USER", annotation = mid.toString())
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary)) {
-                                    append(token)
-                                }
-                                pop()
-                                lastIdx = match.range.last + 1
-                            }
-                        }
-                    }
-                    if (lastIdx < part.length) {
-                        append(part.substring(lastIdx))
-                    }
-                } else {
-                    append(part)
-                }
-            }
-            
-            if (i < matches.size) {
-                val match = matches[i].value.trimEnd('.', ',', ';', ':', '!', '?')
-                val isVideo = match.matches(Regex("(?i)(bv[A-Za-z0-9]+|av\\d+)"))
-                val tag = if (isVideo) "VIDEO" else "URL"
-                val annotation = if (isVideo) "video:$match" else "url:${if (match.startsWith("www.")) "https://$match" else match}"
-                pushStringAnnotation(tag = tag, annotation = annotation)
-                withStyle(SpanStyle(color = Color(0xFF4FC3F7), textDecoration = TextDecoration.Underline)) {
-                    append(match)
-                }
-                pop()
-            }
-        }
-    }
-    return Pair(annotatedString, inlineContentMap)
-}
-
-@Composable
-fun ImageViewerDialog(
-    imageUrl: String,
-    onDismiss: () -> Unit
-) {
-    Dialog(
-        visible = true,
-        onDismissRequest = onDismiss
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-                .clickable { onDismiss() },
-            contentAlignment = Alignment.Center
-        ) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = null,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }

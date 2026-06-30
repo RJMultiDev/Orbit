@@ -54,6 +54,8 @@ import androidx.wear.compose.material3.lazy.transformedHeight
 import coil.compose.AsyncImage
 import com.qx.orbit.bili.data.model.ArticleInfo
 import com.qx.orbit.bili.data.model.Reply
+import com.qx.orbit.bili.presentation.ui.components.ImageViewerDialog
+import com.qx.orbit.bili.presentation.ui.components.ReplyCard
 import com.qx.orbit.bili.presentation.ui.components.WysTimeText
 import com.qx.orbit.bili.presentation.ui.components.UserAvatar
 import com.qx.orbit.bili.presentation.ui.components.UserNameText
@@ -85,49 +87,60 @@ fun ArticleDetailScreen(
 
     ScreenScaffold(timeText = { WysTimeText() }) {
         val errorMsg = error
-        if (article == null && errorMsg == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else if (article == null) {
-            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = errorMsg ?: "加载失败",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { viewModel.loadArticle(articleId) }, modifier = Modifier.size(width = 80.dp, height = 32.dp)) {
-                        Text("重试", style = MaterialTheme.typography.labelSmall)
-                    }
+        when (article) {
+            null if errorMsg == null -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
             }
-        } else {
-            Box(modifier = Modifier.fillMaxSize()) {
-                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                    when (page) {
-                        0 -> ArticleContentPage(article!!, navController, focusRequesters[0])
-                        1 -> ArticleCommentsPage(
-                            viewModel, navController, focusRequesters[1],
-                            onReplyClick = { reply ->
-                                replyTarget = reply
-                                viewModel.loadEmotes()
-                                showWriteReply = true
-                            },
-                            onSendCommentClick = {
-                                replyTarget = null
-                                viewModel.loadEmotes()
-                                showWriteReply = true
-                            }
+            null -> {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = errorMsg ?: "加载失败",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.loadArticle(articleId) },
+                            modifier = Modifier.size(width = 80.dp, height = 32.dp)
+                        ) {
+                            Text("重试", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
-                HorizontalPageIndicator(pagerState = pagerState, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp))
             }
-            if (showWriteReply) {
+            else -> {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                        when (page) {
+                            0 -> ArticleContentPage(article!!, navController, focusRequesters[0])
+                            1 -> ArticleCommentsPage(
+                                viewModel, navController, focusRequesters[1],
+                                onReplyClick = { reply ->
+                                    replyTarget = reply
+                                    viewModel.loadEmotes()
+                                    showWriteReply = true
+                                },
+                                onSendCommentClick = {
+                                    replyTarget = null
+                                    viewModel.loadEmotes()
+                                    showWriteReply = true
+                                }
+                            )
+                        }
+                    }
+                    HorizontalPageIndicator(
+                        pagerState = pagerState,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp)
+                    )
+                }
                 WriteReplyScreen(
                     visible = showWriteReply,
                     targetName = replyTarget?.sender?.name,

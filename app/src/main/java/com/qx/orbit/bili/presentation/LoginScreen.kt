@@ -10,8 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +35,8 @@ import androidx.wear.compose.material3.FilledIconButton
 import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import com.qx.orbit.bili.data.api.LoginApi
 import com.qx.orbit.bili.presentation.viewmodel.HdQrCodeLoginViewModel
 import com.qx.orbit.bili.presentation.viewmodel.HdQrStatus
@@ -44,6 +44,7 @@ import com.qx.orbit.bili.presentation.viewmodel.LoginState
 import com.qx.orbit.bili.presentation.viewmodel.LoginViewModel
 import com.qx.orbit.bili.util.SharedPreferencesUtil
 import androidx.wear.compose.material3.HorizontalPageIndicator
+import androidx.wear.compose.material3.Icon
 import com.google.gson.Gson
 import com.qx.orbit.bili.data.remote.CookieManager
 import com.qx.orbit.bili.presentation.viewmodel.HdQrCodeState
@@ -139,7 +140,7 @@ private fun WebQrPage(state: LoginState, vm: LoginViewModel, onLoginSuccess: () 
         ) {
             when (state) {
                 is LoginState.Initial, is LoginState.LoadingQRCode -> {
-                    CircularProgressIndicator(modifier = Modifier.size(36.dp), color = BiliPink, strokeWidth = 3.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(36.dp), colors = ProgressIndicatorDefaults.colors(indicatorColor = BiliPink), strokeWidth = 3.dp)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("正在获取二维码", fontSize = 13.sp, color = TextSecondary)
                 }
@@ -176,7 +177,7 @@ private fun HdQrPage(state: HdQrCodeState, vm: HdQrCodeLoginViewModel, onLoginSu
         ) {
             when (state.status) {
                 HdQrStatus.REQUESTING -> {
-                    CircularProgressIndicator(modifier = Modifier.size(36.dp), color = BiliPink, strokeWidth = 3.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(36.dp), colors = ProgressIndicatorDefaults.colors(indicatorColor = BiliPink), strokeWidth = 3.dp)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("正在获取二维码", fontSize = 13.sp, color = TextSecondary)
                 }
@@ -297,7 +298,7 @@ private fun CookieImportPage(onLoginSuccess: () -> Unit) {
                     )
                 ) {
                     if (isChecking) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), colors = ProgressIndicatorDefaults.colors(indicatorColor = MaterialTheme.colorScheme.onPrimary), strokeWidth = 2.dp)
                     } else {
                         Icon(imageVector = Icons.Default.Check, contentDescription = "导入")
                     }
@@ -330,7 +331,7 @@ private fun QrContent(qrImage: android.graphics.Bitmap?, message: String) {
             if (qrImage != null) {
                 Image(bitmap = qrImage.asImageBitmap(), contentDescription = "QR Code", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)))
             } else {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = BiliPink, strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), colors = ProgressIndicatorDefaults.colors(indicatorColor = BiliPink), strokeWidth = 2.dp)
             }
         }
         Spacer(modifier = Modifier.height(6.dp))
@@ -368,7 +369,7 @@ private fun SuccessContent(onDone: () -> Unit) {
     }
 
     if (navInfo == null) {
-        CircularProgressIndicator(modifier = Modifier.size(36.dp), color = BiliPink, strokeWidth = 3.dp)
+        CircularProgressIndicator(modifier = Modifier.size(36.dp), colors = ProgressIndicatorDefaults.colors(indicatorColor = BiliPink), strokeWidth = 3.dp)
         Spacer(modifier = Modifier.height(16.dp))
         Text("正在加载信息...", fontSize = 13.sp, color = TextSecondary)
     } else {
