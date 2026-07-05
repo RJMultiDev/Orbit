@@ -418,7 +418,7 @@ fun DynamicDetailScreen(
 
                     if (replies.isNotEmpty()) {
 
-                        items(replies.size) { index ->
+                        items(count = replies.size, key = { replies[it].rpid }) { index ->
                             if (index == replies.size - 3) {
                                 LaunchedEffect(index) { viewModel.loadReplies() }
                             }

@@ -1,6 +1,8 @@
 package com.qx.orbit.bili.presentation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -37,6 +40,7 @@ import androidx.wear.compose.material3.RevealValue
 import androidx.wear.compose.material3.rememberRevealState
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
+import com.qx.orbit.bili.R
 import com.qx.orbit.bili.data.model.VideoCard
 import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
 import com.qx.orbit.bili.presentation.ui.components.WysAlertDialog
@@ -78,19 +82,49 @@ fun FollowListScreen(
 
             if (errorMessage != null && videoList.isEmpty()) {
                 item {
-                    Text(
-                        text = errorMessage ?: "",
-                        modifier = Modifier.padding(16.dp),
-                        textAlign = TextAlign.Center
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_empty22),
+                            contentDescription = "Error",
+                            modifier = Modifier.height(96.dp)
+                        )
+                        Text(
+                            text = errorMessage ?: "",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 5.dp),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             } else if (videoList.isEmpty() && !isLoading) {
                 item {
-                    Text(
-                        text = "暂无追番",
-                        modifier = Modifier.padding(16.dp),
-                        textAlign = TextAlign.Center
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_empty22),
+                            contentDescription = "Error",
+                            modifier = Modifier.height(96.dp)
+                        )
+                        Text(
+                            text = "暂无追番",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 5.dp),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -150,7 +184,10 @@ fun FollowListScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(40.dp)) }
+            if (!videoList.isEmpty()) {
+                item { Spacer(modifier = Modifier.height(40.dp)) }
+            }
+
         }
     }
 

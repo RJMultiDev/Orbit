@@ -45,6 +45,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.runtime.Composable
@@ -176,6 +177,7 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
     }
     
     var dynamicColorScheme by remember { mutableStateOf<androidx.wear.compose.material3.ColorScheme?>(null) }
+    var isColorExtracted by remember { mutableStateOf(false) }
     val defaultColorScheme = MaterialTheme.colorScheme
     
     LaunchedEffect(videoInfo) {
@@ -199,6 +201,9 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                     }
                 }
             }
+        }
+        if (videoInfo != null) {
+            isColorExtracted = true
         }
     }
     
@@ -289,7 +294,7 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             AnimatedContent(
-                targetState = isLoading && videoInfo == null,
+                targetState = (isLoading && videoInfo == null) || (videoInfo != null && !isColorExtracted),
                 transitionSpec = { fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300)) },
                 label = "LoadingAnimation"
             ) { isInitialLoading ->
@@ -308,7 +313,7 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                             Image(
                                 painter = painterResource(R.drawable.bili_2233_fail),
                                 contentDescription = "Error",
-                                modifier = Modifier.fillMaxWidth().offset(y = (-15).dp)
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).offset(y = (-15).dp)
                             )
                             Text(
                                 text = "加载失败，点击重试",
@@ -335,14 +340,20 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                             onPlayClick = {
                                 val info = videoInfo ?: return@VideoInfoPage
                                 val qn = SharedPreferencesUtil.getInt("play_qn", 16)
+                                val cidToPlay = if (info.history != null && info.cids.contains(info.history.cid)) {
+                                    info.history.cid
+                                } else {
+                                    info.cids.firstOrNull() ?: 0L
+                                }
                                 val playerData = PlayerData(
                                     title = info.title,
                                     aid = aid,
-                                    cid = info.cids.firstOrNull() ?: 0L,
+                                    cid = cidToPlay,
                                     cids = info.cids,
                                     pagenames = info.pagenames,
                                     type = if (info.epid > 0) PlayerData.TYPE_BANGUMI else PlayerData.TYPE_VIDEO,
-                                    qn = qn
+                                    qn = qn,
+                                    progress = info.history?.progress ?: 0
                                 )
                                 val jsonStr = Gson().toJson(playerData)
                                 val encodedJson = URLEncoder.encode(jsonStr, StandardCharsets.UTF_8.toString())
@@ -391,9 +402,8 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                             navController = navController,
                             onLoadMore = { viewModel.loadReplies() },
                             onClick = { reply ->
-                                val json = Gson().toJson(reply)
-                                val encoded = URLEncoder.encode(json, "UTF-8")
-                                navController.navigate("reply_detail/${reply.rpid}/$encoded")
+                                navController.currentBackStackEntry?.savedStateHandle?.set("reply", reply)
+                                navController.navigate("reply_detail")
                             },
                             onLikeClick = { reply -> viewModel.likeReply(reply.rpid, reply.liked) },
                             onReplyClick = { reply ->
@@ -868,6 +878,21 @@ fun VideoInfoPage(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                             )
+                            if ((videoInfo.history?.progress ?: 0) > 0) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Filled.History,
+                                    contentDescription = "History",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = "看到 ${StringUtil.toTime(videoInfo.history!!.progress)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -1199,7 +1224,7 @@ fun VideoCommentsPage(
                             Image(
                                 painter = painterResource(R.drawable.bili_2233_fail),
                                 contentDescription = "Error",
-                                modifier = Modifier.fillMaxWidth().offset(y = (-15).dp)
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).offset(y = (-15).dp)
                             )
                             Text(
                                 text = "加载失败，点击重试",
@@ -1212,7 +1237,7 @@ fun VideoCommentsPage(
                     }
                 }
             } else {
-                items(replies.size) { index ->
+                items(count = replies.size, key = { replies[it].rpid }) { index ->
                     if (index == replies.size - 1) {
                         LaunchedEffect(index) { onLoadMore() }
                     }

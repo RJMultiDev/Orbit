@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -40,8 +42,11 @@ import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.HorizontalPageIndicator
 import androidx.wear.compose.material3.ListHeader
@@ -52,7 +57,9 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
 import com.qx.orbit.bili.data.api.ReplyApi
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
 import com.qx.orbit.bili.data.model.ArticleInfo
 import com.qx.orbit.bili.data.model.Reply
 import com.qx.orbit.bili.presentation.ui.components.ImageViewerDialog
@@ -165,6 +172,8 @@ fun ArticleContentPage(
 ) {
     val listState = rememberTransformingLazyColumnState()
     val behavior = rememberSafeRotaryScrollableBehavior(listState)
+    val transformationSpec = rememberTransformationSpec()
+    val isRound = LocalConfiguration.current.isScreenRound
     var showImageDialog by remember { mutableStateOf<Pair<List<String>, Int>?>(null) }
     val segments = remember(item.content) { parseArticleHtml(item.content) }
     val context = LocalContext.current
@@ -191,19 +200,36 @@ fun ArticleContentPage(
     , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
         if (item.title.isNotEmpty()) {
             item {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                )
+                Box(
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
+                        if (isRound) {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                    )
+                }
             }
         }
 
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable {
+                modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
+                    if (isRound) {
+                        with(transformationSpec) {
+                            applyContainerTransformation(scrollProgress)
+                        }
+                    }
+                }.padding(vertical = 8.dp).clickable {
                     item.upInfo?.mid?.let { navController.navigate("user_space/$it") }
                 },
                 verticalAlignment = Alignment.CenterVertically,
@@ -234,59 +260,79 @@ fun ArticleContentPage(
         if (item.banner.isNotEmpty()) {
             item {
                 val fixedUrl = fixUrl(item.banner)
-                AsyncImage(
-                    model = fixedUrl,
+                SubcomposeAsyncImage(
+                    model = ImageRequest.Builder(context).data(fixedUrl).crossfade(true).build(),
                     contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().height(160.dp).padding(vertical = 4.dp).clickable { showImageDialog = Pair(allImages, 0) },
-                    contentScale = ContentScale.Crop
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
+                        if (isRound) {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                    }.height(160.dp).padding(vertical = 4.dp).clickable { showImageDialog = Pair(allImages, 0) },
+                    contentScale = ContentScale.Crop,
+                    loading = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) },
+                    error = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) }
                 )
             }
         }
 
         items(segments.size) { idx ->
-            when (val seg = segments[idx]) {
-                is ArticleSegment.Image -> {
-                    val fixedUrl = fixUrl(seg.url)
-                    AsyncImage(
-                        model = fixedUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { showImageDialog = Pair(allImages, allImages.indexOf(fixedUrl).takeIf { it >= 0 } ?: 0) },
-                        contentScale = ContentScale.Fit
-                    )
-                }
-                is ArticleSegment.Text -> {
-                    Text(
-                        text = seg.text,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                    )
-                }
-                is ArticleSegment.Heading -> {
-                    Text(
-                        text = seg.text,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    )
-                }
-                is ArticleSegment.Link -> {
-                    Text(
-                        text = seg.text,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).clickable {
-                            try { context.startActivity(Intent(Intent.ACTION_VIEW, fixUrl(seg.url).toUri())) } catch (_: Exception) {}
+            Box(
+                modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
+                    if (isRound) {
+                        with(transformationSpec) {
+                            applyContainerTransformation(scrollProgress)
                         }
-                    )
+                    }
                 }
-                is ArticleSegment.Quote -> {
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).padding(start = 8.dp)) {
+            ) {
+                when (val seg = segments[idx]) {
+                    is ArticleSegment.Image -> {
+                        val fixedUrl = fixUrl(seg.url)
+                        SubcomposeAsyncImage(
+                            model = ImageRequest.Builder(context).data(fixedUrl).crossfade(true).build(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { showImageDialog = Pair(allImages, allImages.indexOf(fixedUrl).takeIf { it >= 0 } ?: 0) },
+                            contentScale = ContentScale.Fit,
+                            loading = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) },
+                            error = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) }
+                        )
+                    }
+                    is ArticleSegment.Text -> {
                         Text(
                             text = seg.text,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                         )
+                    }
+                    is ArticleSegment.Heading -> {
+                        Text(
+                            text = seg.text,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        )
+                    }
+                    is ArticleSegment.Link -> {
+                        Text(
+                            text = seg.text,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).clickable {
+                                try { context.startActivity(Intent(Intent.ACTION_VIEW, fixUrl(seg.url).toUri())) } catch (_: Exception) {}
+                            }
+                        )
+                    }
+                    is ArticleSegment.Quote -> {
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).padding(start = 8.dp)) {
+                            Text(
+                                text = seg.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
@@ -295,7 +341,16 @@ fun ArticleContentPage(
         item {
             val stats = item.stats
             if (stats != null) {
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
+                        if (isRound) {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                    }.padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
                     Text("${formatCount(stats.view)}阅读", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                     Text("${formatCount(stats.like)}赞", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                     Text("${formatCount(stats.coin)}投币", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
@@ -315,6 +370,7 @@ fun ArticleCommentsPage(
     onSendCommentClick: () -> Unit = {}
 ) {
     val replies by viewModel.replies.collectAsState()
+    val replyCount by viewModel.replyCount.collectAsState()
     val isReplyLoading by viewModel.isReplyLoading.collectAsState()
     val listState = rememberTransformingLazyColumnState()
     val transformationSpec = rememberTransformationSpec()
@@ -325,17 +381,31 @@ fun ArticleCommentsPage(
         modifier = Modifier.fillMaxSize().rotaryScrollable(behavior, focusRequester),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 32.dp)
     , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
-        item { ListHeader { Text("评论区") } }
+        item {
+            ListHeader(
+                modifier = Modifier.transformedHeight(this, transformationSpec),
+                transformation = SurfaceTransformation(transformationSpec)
+            ) {
+                Text(
+                    "评论(${formatCount(replyCount)})",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
         item {
             Button(
                 onClick = onSendCommentClick,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
+                transformation = SurfaceTransformation(transformationSpec),
+                icon = {Icon(imageVector = Icons.Filled.Edit, contentDescription = null)},
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("发送评论", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("发送评论", color = MaterialTheme.colorScheme.onPrimary)
             }
         }
-        items(replies.size) { index ->
+        items(count = replies.size, key = { replies[it].rpid }) { index ->
             if (index == replies.size - 3) {
                 LaunchedEffect(index) { viewModel.loadReplies() }
             }
@@ -361,10 +431,19 @@ fun ArticleCommentsPage(
     }
 }
 
-private fun fixUrl(url: String): String = when {
-    url.startsWith("//") -> "https:$url"
-    url.startsWith("http://") -> url.replaceFirst("http://", "https://")
-    else -> url
+private fun fixUrl(url: String): String {
+    val base = when {
+        url.startsWith("//") -> "https:$url"
+        url.startsWith("http://") -> url.replaceFirst("http://", "https://")
+        else -> url
+    }
+    // 如果已含 @ 裁剪参数则不再追加
+    if (base.contains("@")) return base.replace(".avif", ".webp")
+    // B站 CDN 图片追加 @480w.webp 缩略后缀
+    if (base.contains("hdslb.com") || base.contains("bfs/")) {
+        return base.replace(".avif", ".webp") + "@480w.webp"
+    }
+    return base.replace(".avif", ".webp")
 }
 
 private sealed class ArticleSegment {

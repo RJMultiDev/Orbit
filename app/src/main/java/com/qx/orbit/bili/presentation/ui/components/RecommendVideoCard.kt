@@ -180,6 +180,24 @@ fun RecommendVideoCard(
                     }
                 }
             }
+
+            // Progress Bar at the bottom
+            item.progressPercent?.let { percent ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .align(Alignment.BottomStart)
+                        .background(Color.White.copy(alpha = 0.3f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(percent.coerceIn(0f, 1f))
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                }
+            }
         }
     }
 }

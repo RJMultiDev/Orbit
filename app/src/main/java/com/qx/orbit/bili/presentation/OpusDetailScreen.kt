@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -56,8 +59,11 @@ import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ButtonGroup
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.FilledIconButton
@@ -71,7 +77,8 @@ import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.qx.orbit.bili.R
 import com.qx.orbit.bili.data.api.ReplyApi
@@ -162,9 +169,8 @@ fun OpusDetailScreen(
                                 showWriteReply = true
                             },
                             onClick = { reply ->
-                                val json = Gson().toJson(reply)
-                                val encoded = URLEncoder.encode(json, "UTF-8")
-                                navController.navigate("reply_detail/${reply.rpid}/$encoded")
+                                navController.currentBackStackEntry?.savedStateHandle?.set("reply", reply)
+                                navController.navigate("reply_detail")
                             }
                         )
                     }
@@ -200,6 +206,8 @@ fun OpusContentPage(
     val context = LocalContext.current
     val listState = rememberTransformingLazyColumnState()
     val behavior = rememberSafeRotaryScrollableBehavior(listState)
+    val transformationSpec = rememberTransformationSpec()
+    val isRound = LocalConfiguration.current.isScreenRound
     var showImageDialog by remember { mutableStateOf<Pair<List<String>, Int>?>(null) }
     
     val likeInteractionSource = remember { MutableInteractionSource() }
@@ -208,21 +216,13 @@ fun OpusContentPage(
     val allImages = remember(item.topImages, item.paragraphs) {
         val list = mutableListOf<String>()
         item.topImages.forEach { imgUrl ->
-            val fixedUrl = when {
-                imgUrl.startsWith("//") -> "https:$imgUrl"
-                imgUrl.startsWith("http://") -> imgUrl.replaceFirst("http://", "https://")
-                else -> imgUrl
-            }
+            val fixedUrl = fixUrl(imgUrl)
             list.add(fixedUrl)
         }
         item.paragraphs?.forEach { p ->
             if (p.type == OpusParagraph.TYPE_PIC) {
                 p.pics.forEach { imgUrl ->
-                    val fixedUrl = when {
-                        imgUrl.startsWith("//") -> "https:$imgUrl"
-                        imgUrl.startsWith("http://") -> imgUrl.replaceFirst("http://", "https://")
-                        else -> imgUrl
-                    }
+                    val fixedUrl = fixUrl(imgUrl)
                     list.add(fixedUrl)
                 }
             }
@@ -247,12 +247,49 @@ fun OpusContentPage(
     , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
         if (item.title.isNotEmpty()) {
             item {
-                androidx.compose.material3.Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                Box(
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
+                        if (isRound) {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                    }
+                ) {
+                    androidx.compose.material3.Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                    )
+                }
+            }
+        }
+
+        if (item.cover.isNotEmpty()) {
+            item {
+                val coverUrl = fixUrl(item.cover)
+                SubcomposeAsyncImage(
+                    model = ImageRequest.Builder(context).data(coverUrl).crossfade(true).build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 160.dp)
+                        .transformedHeight(this, transformationSpec)
+                        .graphicsLayer {
+                            if (isRound) {
+                                with(transformationSpec) {
+                                    applyContainerTransformation(scrollProgress)
+                                }
+                            }
+                        }
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    loading = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) },
+                    error = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) }
                 )
             }
         }
@@ -261,6 +298,14 @@ fun OpusContentPage(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .transformedHeight(this, transformationSpec)
+                    .graphicsLayer {
+                        if (isRound) {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                    }
                     .padding(vertical = 8.dp)
                     .clickable {
                         item.upInfo?.let {
@@ -290,14 +335,18 @@ fun OpusContentPage(
         
         if (item.topImages.isNotEmpty()) {
             item {
-                Column {
-                    item.topImages.forEach { imgUrl ->
-                        val fixedUrl = when {
-                            imgUrl.startsWith("//") -> "https:$imgUrl"
-                            imgUrl.startsWith("http://") -> imgUrl.replaceFirst("http://", "https://")
-                            else -> imgUrl
+                Column(
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
+                        if (isRound) {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
                         }
-                        AsyncImage(
+                    }
+                ) {
+                    item.topImages.forEach { imgUrl ->
+                        val fixedUrl = fixUrl(imgUrl)
+                        SubcomposeAsyncImage(
                             model = ImageRequest.Builder(context).data(fixedUrl).crossfade(true).build(),
                             contentDescription = null,
                             modifier = Modifier
@@ -305,7 +354,9 @@ fun OpusContentPage(
                                 .padding(vertical = 4.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { showImageDialog = Pair(allImages, allImages.indexOf(fixedUrl).takeIf { it >= 0 } ?: 0) },
-                            contentScale = ContentScale.FillWidth
+                            contentScale = ContentScale.FillWidth,
+                            loading = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) },
+                            error = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) }
                         )
                     }
                 }
@@ -314,7 +365,16 @@ fun OpusContentPage(
 
         item.paragraphs?.forEach { paragraph ->
             item {
-                when (paragraph.type) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
+                        if (isRound) {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                    }
+                ) {
+                    when (paragraph.type) {
                     OpusParagraph.TYPE_TEXT, OpusParagraph.TYPE_HEADING -> {
                         val inlineContentMap = mutableMapOf<String, InlineTextContent>()
                         val annotatedStr = buildAnnotatedString {
@@ -338,7 +398,7 @@ fun OpusContentPage(
                                                 placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
                                             )
                                         ) {
-                                            AsyncImage(
+                                            SubcomposeAsyncImage(
                                                 model = node.emoteUrl,
                                                 contentDescription = node.text,
                                                 modifier = Modifier.fillMaxSize()
@@ -389,12 +449,8 @@ fun OpusContentPage(
                     OpusParagraph.TYPE_PIC -> {
                         Column {
                             paragraph.pics.forEach { imgUrl ->
-                                val fixedUrl = when {
-                                    imgUrl.startsWith("//") -> "https:$imgUrl"
-                                    imgUrl.startsWith("http://") -> imgUrl.replaceFirst("http://", "https://")
-                                    else -> imgUrl
-                                }
-                                AsyncImage(
+                                val fixedUrl = fixUrl(imgUrl)
+                                SubcomposeAsyncImage(
                                     model = ImageRequest.Builder(context).data(fixedUrl).crossfade(true).build(),
                                     contentDescription = null,
                                     modifier = Modifier
@@ -402,7 +458,9 @@ fun OpusContentPage(
                                         .padding(vertical = 4.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { showImageDialog = Pair(allImages, allImages.indexOf(fixedUrl).takeIf { it >= 0 } ?: 0) },
-                                    contentScale = ContentScale.FillWidth
+                                    contentScale = ContentScale.FillWidth,
+                                    loading = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) },
+                                    error = { Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2A))) }
                                 )
                             }
                         }
@@ -413,11 +471,20 @@ fun OpusContentPage(
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
+                }
             }
         }
 
         item {
-            ButtonGroup(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+            ButtonGroup(
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp).transformedHeight(this, transformationSpec).graphicsLayer {
+                    if (isRound) {
+                        with(transformationSpec) {
+                            applyContainerTransformation(scrollProgress)
+                        }
+                    }
+                }
+            ) {
                 FilledIconButton(
                     onClick = { viewModel.toggleLike() },
                     interactionSource = likeInteractionSource,
@@ -470,6 +537,7 @@ fun OpusCommentsPage(
     val replies by viewModel.replies.collectAsState()
     val opus by viewModel.opus.collectAsState()
     val isReplyLoading by viewModel.isReplyLoading.collectAsState()
+    val replyCount by viewModel.replyCount.collectAsState()
     val listState = rememberTransformingLazyColumnState()
     val transformationSpec = rememberTransformationSpec()
     val behavior = rememberSafeRotaryScrollableBehavior(listState)
@@ -482,20 +550,28 @@ fun OpusCommentsPage(
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 32.dp)
     , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
         item {
-            ListHeader {
-                Text("评论区")
+            ListHeader(
+                modifier = Modifier.transformedHeight(this, transformationSpec),
+                transformation = SurfaceTransformation(transformationSpec)
+            ) {
+                Text(
+                    "评论(${formatCount(replyCount)})",
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
         item {
             Button(
                 onClick = onSendCommentClick,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
+                transformation = SurfaceTransformation(transformationSpec),
+                icon = {Icon(imageVector = Icons.Filled.Edit, contentDescription = null)},
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("发送评论", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                androidx.compose.material3.Text("发送评论", color = MaterialTheme.colorScheme.onPrimary)
             }
         }
-        items(replies.size) { index ->
+        items(count = replies.size, key = { replies[it].rpid }) { index ->
             if (index == replies.size - 3) {
                 LaunchedEffect(index) { viewModel.loadReplies() }
             }
@@ -520,4 +596,17 @@ fun OpusCommentsPage(
         }
         item { Spacer(modifier = Modifier.height(32.dp)) }
     }
+}
+
+private fun fixUrl(url: String): String {
+    val base = when {
+        url.startsWith("//") -> "https:$url"
+        url.startsWith("http://") -> url.replaceFirst("http://", "https://")
+        else -> url
+    }
+    if (base.contains("@")) return base.replace(".avif", ".webp")
+    if (base.contains("hdslb.com") || base.contains("bfs/")) {
+        return base.replace(".avif", ".webp") + "@480w.webp"
+    }
+    return base.replace(".avif", ".webp")
 }

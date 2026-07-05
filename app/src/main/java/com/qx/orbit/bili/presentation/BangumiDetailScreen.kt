@@ -1,5 +1,10 @@
 package com.qx.orbit.bili.presentation
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -132,6 +137,7 @@ fun BangumiDetailScreen(navController: NavHostController, mediaId: Long, viewMod
     }
     
     var dynamicColorScheme by remember { mutableStateOf<androidx.wear.compose.material3.ColorScheme?>(null) }
+    var isColorExtracted by remember { mutableStateOf(false) }
     val defaultColorScheme = MaterialTheme.colorScheme
     
     LaunchedEffect(bangumiInfo) {
@@ -157,13 +163,16 @@ fun BangumiDetailScreen(navController: NavHostController, mediaId: Long, viewMod
                 }
             }
         }
+        if (bangumiInfo != null) {
+            isColorExtracted = true
+        }
     }
     
     MaterialTheme(colorScheme = dynamicColorScheme ?: defaultColorScheme) {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            androidx.compose.animation.Crossfade(
-                targetState = (isLoading || bangumiInfo == null) && errorMessage == null,
-                animationSpec = androidx.compose.animation.core.tween(500),
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            AnimatedContent(
+                targetState = (isLoading || bangumiInfo == null || !isColorExtracted) && errorMessage == null,
+                transitionSpec = { fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500)) },
                 label = "LoadingAnimation"
         ) { isInitialLoading ->
             if (isInitialLoading) {
@@ -179,7 +188,7 @@ fun BangumiDetailScreen(navController: NavHostController, mediaId: Long, viewMod
                         Image(
                             painter = painterResource(R.drawable.bili_2233_fail),
                             contentDescription = "Error",
-                            modifier = Modifier.fillMaxWidth().offset(y = (-15).dp)
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).offset(y = (-15).dp)
                         )
                         Text(
                             text = "加载失败，点击重试",
@@ -245,9 +254,8 @@ fun BangumiDetailScreen(navController: NavHostController, mediaId: Long, viewMod
                                 navController = navController,
                                 onLoadMore = { viewModel.loadReplies() },
                                 onClick = { reply ->
-                                    val json = Gson().toJson(reply)
-                                    val encoded = URLEncoder.encode(json, "UTF-8")
-                                    navController.navigate("reply_detail/${reply.rpid}/$encoded")
+                                    navController.currentBackStackEntry?.savedStateHandle?.set("reply", reply)
+                                    navController.navigate("reply_detail")
                                 },
                                 onLikeClick = { reply -> viewModel.likeReply(reply.rpid, reply.liked) },
                                 onReplyClick = { reply ->

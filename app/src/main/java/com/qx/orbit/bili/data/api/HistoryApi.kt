@@ -20,13 +20,26 @@ object HistoryApi {
 
     internal data class HistoryItem(
         @SerializedName("title") val title: String? = null,
+        @SerializedName("author_name") val author_name: String? = null,
         @SerializedName("author") val author: HistoryRef? = null,
-        @SerializedName("pic") val pic: String? = null,
+        @SerializedName("cover") val cover: String? = null,
+        @SerializedName("covers") val covers: List<String>? = null,
         @SerializedName("stat") val stat: HistoryStat? = null,
         @SerializedName("aid") val aid: Long = 0,
         @SerializedName("bvid") val bvid: String? = null,
         @SerializedName("cid") val cid: Long = 0,
-        @SerializedName("progress") val progress: Int = 0
+        @SerializedName("progress") val progress: Int = 0,
+        @SerializedName("duration") val duration: Int = 0,
+        @SerializedName("kid") val kid: Long = 0,
+        @SerializedName("history") val history: HistoryDetail? = null
+    )
+
+    internal data class HistoryDetail(
+        @SerializedName("oid") val oid: Long = 0,
+        @SerializedName("epid") val epid: Long = 0,
+        @SerializedName("bvid") val bvid: String? = null,
+        @SerializedName("cid") val cid: Long = 0,
+        @SerializedName("business") val business: String? = null
     )
 
     internal data class HistoryRef(
@@ -49,11 +62,61 @@ object HistoryApi {
         api.reportHistory(aid, cid, progress, CookieManager.getCsrf())
     }
 
-    suspend fun getHistory(lastResult: ApiResult, videoList: List<VideoCard>): ApiResult = withContext(Dispatchers.IO) {
+    suspend fun getHistory(lastResult: ApiResult, videoList: MutableList<VideoCard>): ApiResult = withContext(Dispatchers.IO) {
         when (val resp = api.getHistory("", lastResult.timestamp, lastResult.business, lastResult.offset)) {
             is Result.Success -> {
                 val parsed: ApiResponse<HistoryData>? = GsonConfig.gson.fromJson(resp.data, object : TypeToken<ApiResponse<HistoryData>>() {}.type)
                 if (parsed == null || !parsed.isSuccess || parsed.data == null) return@withContext ApiResult(code = parsed?.code ?: -1, message = parsed?.message ?: "")
+                
+                parsed.data.list?.forEach { item ->
+                    val bvid = item.bvid ?: item.history?.bvid ?: ""
+                    val aid = item.history?.oid ?: item.aid
+                    val type = when (item.history?.business) {
+                        "archive" -> "video"
+                        "pgc" -> "bangumi"
+                        "article", "article-list" -> "article"
+                        else -> item.history?.business ?: "video"
+                    }
+                    val isVideoOrBangumi = type == "video" || type == "bangumi"
+                    
+                    val isFinished = item.progress == -1 || (item.duration > 0 && item.progress >= item.duration * 0.95)
+                    val progressPercent = if (isVideoOrBangumi) {
+                        if (isFinished) {
+                            1f
+                        } else if (item.duration > 0 && item.progress > 0) {
+                            item.progress.toFloat() / item.duration.toFloat()
+                        } else {
+                            null
+                        }
+                    } else null
+                    
+                    val viewText = if (isVideoOrBangumi) {
+                        if (isFinished) "已看完"
+                        else "看到${StringUtil.toTime(item.progress)}"
+                    } else {
+                        item.stat?.view?.let { StringUtil.toWan(it.toLong()) } ?: ""
+                    }
+                    
+                    var cover = if (item.covers?.isNotEmpty() == true) item.covers.first() else item.cover ?: ""
+                    if (cover.startsWith("//")) cover = "https:$cover"
+                    else if (cover.startsWith("http://")) cover = cover.replace("http://", "https://")
+                    
+                    videoList.add(
+                        VideoCard(
+                            title = item.title ?: "",
+                            upName = item.author_name ?: item.author?.name ?: "",
+                            view = viewText,
+                            cover = cover,
+                            type = type,
+                            aid = aid,
+                            bvid = bvid,
+                            cid = item.history?.cid ?: item.cid,
+                            seasonId = if (type == "bangumi") item.kid else 0,
+                            progressPercent = progressPercent
+                        )
+                    )
+                }
+
                 ApiResult(
                     code = parsed.code,
                     offset = parsed.data.cursor?.max ?: 0,

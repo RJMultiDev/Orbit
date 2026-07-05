@@ -98,6 +98,11 @@ object PlayerApi {
         @SerializedName("content") val content: String? = null
     )
 
+    internal data class PlayerV2Data(
+        @SerializedName("last_play_time") val last_play_time: Long = 0,
+        @SerializedName("last_play_cid") val last_play_cid: Long = 0
+    )
+
     internal data class SubtitleInner(
         @SerializedName("interaction") val interaction: InteractionData? = null
     )
@@ -340,6 +345,23 @@ object PlayerApi {
         val type = object : TypeToken<ApiResponse<SubtitleInner>>() {}.type
         val resp: ApiResponse<SubtitleInner>? = GsonConfig.gson.fromJson(jsonElement, type)
         resp?.data?.interaction?.graph_version ?: 0L
+    }
+
+    suspend fun getHistoryProgress(aid: Long, cid: Long): History? = withContext(Dispatchers.IO) {
+        val jsonElement = when (val result = api.getPlayerV2(aid, cid)) {
+            is Result.Success -> result.data
+            is Result.Error -> return@withContext null
+        }
+        val type = object : TypeToken<ApiResponse<PlayerV2Data>>() {}.type
+        val resp: ApiResponse<PlayerV2Data>? = GsonConfig.gson.fromJson(jsonElement, type)
+        if (resp == null || !resp.isSuccess || resp.data == null) return@withContext null
+        val data = resp.data
+        if (data.last_play_time > 0) {
+            History(
+                cid = data.last_play_cid,
+                progress = (data.last_play_time / 1000).toInt()
+            )
+        } else null
     }
 
     suspend fun getSubtitle(url: String): Array<Subtitle> = withContext(Dispatchers.IO) {

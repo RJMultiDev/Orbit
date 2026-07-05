@@ -1,4 +1,6 @@
 package com.qx.orbit.bili.data.model
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 
 enum class ContentType(val typeCode: Int) {
     Video(1), Topic(2), Activity(4), ShortVideo(5), BlackRoom(6),
@@ -12,6 +14,7 @@ enum class ContentType(val typeCode: Int) {
     }
 }
 
+@Parcelize
 data class Reply(
     val rpid: Long = 0,
     val oid: Long = 0,
@@ -33,4 +36,4 @@ data class Reply(
     val isTop: Boolean = false,
     val emotes: Map<String, Emote> = emptyMap(),
     val members: Map<String, Long> = emptyMap()
-)
+) : Parcelable

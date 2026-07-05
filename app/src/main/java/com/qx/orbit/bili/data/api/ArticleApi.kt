@@ -23,7 +23,16 @@ object ArticleApi {
         @SerializedName("stats") val stats: StatsData? = null,
         @SerializedName("words") val words: Int = 0,
         @SerializedName("dynamic") val dynamic: String? = null,
-        @SerializedName("content") val content: String? = null
+        @SerializedName("content") val content: String? = null,
+        @SerializedName("opus") val opus: OpusData? = null
+    )
+
+    internal data class OpusData(
+        @SerializedName("content") val content: OpusContentData? = null
+    )
+
+    internal data class OpusContentData(
+        @SerializedName("paragraphs") val paragraphs: List<OpusApi.ParagraphData>? = null
     )
 
     internal data class AuthorData(
@@ -46,12 +55,34 @@ object ArticleApi {
             is Result.Success -> result.data
             is Result.Error -> return@withContext null
         }
+        android.util.Log.d("ArticleApi", "Raw JSON for article $id: $jsonElement")
         val typeToken = object : TypeToken<ApiResponse<ArticleViewData>>() {}.type
         val resp: ApiResponse<ArticleViewData>? = GsonConfig.gson.fromJson(jsonElement, typeToken)
         if (resp == null || !resp.isSuccess || resp.data == null) return@withContext null
         val data = resp.data
         val author = data.author
         val stats = data.stats
+        var finalContent = data.content ?: ""
+        val opusParas = data.opus?.content?.paragraphs
+        if (opusParas != null && opusParas.isNotEmpty()) {
+            finalContent = buildString {
+                for (p in opusParas) {
+                    when (p.para_type) {
+                        1, 4 -> {
+                            val text = p.text?.nodes?.joinToString("") { it.word?.words ?: it.rich?.text ?: "" } ?: ""
+                            append("<p>$text</p>")
+                        }
+                        2 -> {
+                            p.pic?.pics?.forEach { pic ->
+                                append("<figure><img src=\"${pic.url}\" /></figure>")
+                            }
+                        }
+                        3 -> append("<hr>")
+                    }
+                }
+            }
+        }
+
         ArticleInfo(
             id = data.id,
             title = data.title ?: "",
@@ -69,7 +100,7 @@ object ArticleApi {
             },
             wordCount = data.words,
             keywords = data.dynamic ?: "",
-            content = data.content ?: ""
+            content = finalContent
         )
     }
 

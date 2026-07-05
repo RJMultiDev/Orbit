@@ -20,6 +20,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.imageLoader
+import com.qx.orbit.bili.presentation.theme.ActiveDynamicTheme
+import com.qx.orbit.bili.presentation.theme.extractSeedColorFromBitmap
+import com.qx.orbit.bili.presentation.theme.generateWearColorSchemeFromSeed
+import androidx.compose.runtime.setValue
 import com.qx.orbit.bili.presentation.ui.components.LevelIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,39 +88,73 @@ fun UserSpaceScreen(
     val currentMid = remember { com.qx.orbit.bili.data.remote.CookieManager.getMid() }
     val isSelf = mid == currentMid
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        AnimatedContent(
-            targetState = userInfo == null,
-            transitionSpec = { fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300)) },
-            label = "LoadingAnimation"
-        ) { isInitialLoading ->
-            if (isInitialLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+    val context = LocalContext.current
+    var dynamicColorScheme by remember { mutableStateOf<androidx.wear.compose.material3.ColorScheme?>(null) }
+    var isColorExtracted by remember { mutableStateOf(false) }
+    val defaultColorScheme = MaterialTheme.colorScheme
+
+    LaunchedEffect(userInfo) {
+        val rawCover = userInfo?.avatar ?: ""
+        if (rawCover.isNotEmpty()) {
+            val secureCover = rawCover.replace("http://", "https://")
+            val coverUrl = if (secureCover.contains("@")) secureCover else "${secureCover}@128w_128h_1c.webp"
+            val request = ImageRequest.Builder(context)
+                .data(coverUrl)
+                .size(128)
+                .allowHardware(false)
+                .build()
+            val result = context.imageLoader.execute(request)
+            if (result is coil.request.SuccessResult) {
+                val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                if (bitmap != null) {
+                    val seedColor = extractSeedColorFromBitmap(bitmap)
+                    if (seedColor != null) {
+                        dynamicColorScheme = generateWearColorSchemeFromSeed(seedColor, defaultColorScheme)
+                        ActiveDynamicTheme.colorScheme = dynamicColorScheme
+                    }
                 }
-            } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxSize()
-                    ) { page ->
-                        val isFocusedPage = pagerState.currentPage == page
-                        LaunchedEffect(isFocusedPage) {
-                            if (isFocusedPage) {
-                                try { focusRequesters[page].requestFocus() } catch (e: Exception) {}
+            }
+        }
+        if (userInfo != null) {
+            isColorExtracted = true
+        }
+    }
+
+    MaterialTheme(colorScheme = dynamicColorScheme ?: defaultColorScheme) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            AnimatedContent(
+                targetState = userInfo == null || !isColorExtracted,
+                transitionSpec = { fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300)) },
+                label = "LoadingAnimation"
+            ) { isInitialLoading ->
+                if (isInitialLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            val isFocusedPage = pagerState.currentPage == page
+                            LaunchedEffect(isFocusedPage) {
+                                if (isFocusedPage) {
+                                    try { focusRequesters[page].requestFocus() } catch (e: Exception) {}
+                                }
+                            }
+    
+                            when (page) {
+                                0 -> UserDynamicsPage(userInfo, dynamics, focusRequesters[0], navController, viewModel, isFollowed, isSelf)
+                                1 -> UserVideosPage(userInfo, videos, focusRequesters[1], navController, viewModel)
+                                2 -> UserArticlesPage(userInfo, articles, focusRequesters[2], navController, viewModel)
                             }
                         }
-
-                        when (page) {
-                            0 -> UserDynamicsPage(userInfo, dynamics, focusRequesters[0], navController, viewModel, isFollowed, isSelf)
-                            1 -> UserVideosPage(videos, focusRequesters[1], navController, viewModel)
-                            2 -> UserArticlesPage(articles, focusRequesters[2], navController, viewModel)
-                        }
+                        HorizontalPageIndicator(
+                            pagerState = pagerState,
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
+                        )
                     }
-                    HorizontalPageIndicator(
-                        pagerState = pagerState,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
-                    )
                 }
             }
         }
@@ -135,11 +180,13 @@ fun UserDynamicsPage(
         scrollState = listState, 
         modifier = Modifier.fillMaxSize().focusRequester(focusRequester)
     ) { contentPadding ->
-        TransformingLazyColumn(
-            state = listState,
-            contentPadding = contentPadding,
-            modifier = Modifier.fillMaxSize()
-        , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            UserSpaceBackground(listState, userInfo?.avatar)
+            TransformingLazyColumn(
+                state = listState,
+                contentPadding = contentPadding,
+                modifier = Modifier.fillMaxSize()
+            , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
             item {
                 userInfo?.let { info ->
                     Column(
@@ -234,11 +281,13 @@ fun UserDynamicsPage(
                 }
             }
         }
+        }
     }
 }
 
 @Composable
 fun UserVideosPage(
+    userInfo: UserInfo?,
     videos: List<VideoCard>,
     focusRequester: FocusRequester,
     navController: NavHostController,
@@ -251,11 +300,12 @@ fun UserVideosPage(
         scrollState = listState, 
         modifier = Modifier.fillMaxSize().focusRequester(focusRequester)
     ) { contentPadding ->
-        TransformingLazyColumn(
-            state = listState,
-            contentPadding = contentPadding,
-            modifier = Modifier.fillMaxSize()
-        , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            TransformingLazyColumn(
+                state = listState,
+                contentPadding = contentPadding,
+                modifier = Modifier.fillMaxSize()
+            , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
             item {
                 ListHeader {
                     Text(text = "发布的视频")
@@ -278,11 +328,13 @@ fun UserVideosPage(
                 }
             }
         }
+        }
     }
 }
 
 @Composable
 fun UserArticlesPage(
+    userInfo: UserInfo?,
     articles: List<ArticleCard>,
     focusRequester: FocusRequester,
     navController: NavHostController,
@@ -295,11 +347,12 @@ fun UserArticlesPage(
         scrollState = listState, 
         modifier = Modifier.fillMaxSize().focusRequester(focusRequester)
     ) { contentPadding ->
-        TransformingLazyColumn(
-            state = listState,
-            contentPadding = contentPadding,
-            modifier = Modifier.fillMaxSize()
-        , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            TransformingLazyColumn(
+                state = listState,
+                contentPadding = contentPadding,
+                modifier = Modifier.fillMaxSize()
+            , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
             item {
                 ListHeader {
                     Text(text = "发布的图文")
@@ -322,7 +375,51 @@ fun UserArticlesPage(
                 }
             }
         }
+        }
     }
 }
 
-
+@Composable
+fun UserSpaceBackground(
+    listState: androidx.wear.compose.foundation.lazy.TransformingLazyColumnState,
+    avatarUrl: String?
+) {
+    val secureCover = avatarUrl?.replace("http://", "https://") ?: ""
+    if (secureCover.isNotEmpty()) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(secureCover)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(48.dp)
+                .graphicsLayer { alpha = 0.6f }
+        )
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black)
+                )
+            )
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                val headerItem = listState.layoutInfo.visibleItems.find { it.index == 0 }
+                alpha = if (headerItem != null) {
+                    val scrolled = -headerItem.offset.toFloat()
+                    (scrolled / 200f).coerceIn(0f, 1f)
+                } else {
+                    1f
+                }
+            }
+            .background(Color.Black)
+    )
+}

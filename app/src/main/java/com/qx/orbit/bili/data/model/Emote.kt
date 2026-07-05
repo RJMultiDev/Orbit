@@ -1,5 +1,8 @@
 package com.qx.orbit.bili.data.model
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 
+@Parcelize
 data class Emote(
     val id: Int = 0,
     val packageId: Int = 0,
@@ -7,8 +10,9 @@ data class Emote(
     val alias: String = "",
     val url: String = "",
     val size: Int = 0
-)
+) : Parcelable
 
+@Parcelize
 data class EmotePackage(
     val id: Int = 0,
     val text: String = "",
@@ -19,4 +23,4 @@ data class EmotePackage(
     val item_id: Int = 0,
     val emotes: List<Emote> = emptyList(),
     val permanent: Boolean = false
-)
+) : Parcelable

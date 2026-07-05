@@ -153,7 +153,7 @@ fun ReplyDetailScreen(
                         }
                     }
                 } else {
-                    items(childReplies.size) { index ->
+                    items(count = childReplies.size, key = { childReplies[it].rpid }) { index ->
                         if (index == childReplies.size - 1) {
                             LaunchedEffect(index) { viewModel.loadMore() }
                         }

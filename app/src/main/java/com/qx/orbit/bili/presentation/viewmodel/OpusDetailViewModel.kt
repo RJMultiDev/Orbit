@@ -28,6 +28,9 @@ class OpusDetailViewModel : ViewModel() {
     private val _isReplyLoading = MutableStateFlow(false)
     val isReplyLoading: StateFlow<Boolean> = _isReplyLoading.asStateFlow()
 
+    private val _replyCount = MutableStateFlow(0)
+    val replyCount: StateFlow<Int> = _replyCount.asStateFlow()
+
     private val _emotes = MutableStateFlow<List<EmoteApi.EmotePackage>?>(null)
     val emotes: StateFlow<List<EmoteApi.EmotePackage>?> = _emotes.asStateFlow()
 
@@ -56,6 +59,9 @@ class OpusDetailViewModel : ViewModel() {
             try {
                 val data = _opus.value ?: return@launch
                 val result = ReplyApi.getRepliesLazy(data.commentId, 0, replyNext, data.commentType, 1)
+                if (replyNext == null) {
+                    _replyCount.value = result.first
+                }
                 replyNext = result.second
                 hasMoreReplies = result.second != null && result.second?.isNotBlank() == true
                 val newReplies = _replies.value.toMutableList().apply { addAll(result.third) }

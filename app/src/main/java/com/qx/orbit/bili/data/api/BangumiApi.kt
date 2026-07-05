@@ -520,7 +520,7 @@ object BangumiApi {
                             last_time = p.last_time
                         )
                     },
-                    follow = if (status.follow > 0 || status.follow_status > 0 || status.status > 0) 1 else 0
+                    follow = if (status.follow > 0) 1 else 0
                 )
             }
         )

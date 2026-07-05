@@ -47,9 +47,10 @@ fun parseRichText(
     val urlPattern = "(https?://[^\\s<>()\\[\\]\"',;!?，。！？、：；“”（）【】《》]+|www\\.[^\\s<>()\\[\\]\"',;!?，。！？、：；“”（）【】《》]+)"
     val videoPattern = "(?i)(bv[A-Za-z0-9]+|av\\d+)"
     val fullPattern = Regex("($urlPattern|$videoPattern)")
+    val topicPattern = Regex("#([^#\\n]+)#")
 
     val annotatedString = buildAnnotatedString {
-        if (emotes.isEmpty() && members.isEmpty() && !processedText.contains(fullPattern)) {
+        if (emotes.isEmpty() && members.isEmpty() && !topicPattern.containsMatchIn(processedText) && !processedText.contains(fullPattern)) {
             append(processedText)
             return@buildAnnotatedString
         }
@@ -60,8 +61,8 @@ fun parseRichText(
         for (i in parts.indices) {
             val part = parts[i]
             if (part.isNotEmpty()) {
-                if (emotes.isNotEmpty() || members.isNotEmpty()) {
-                    val tokenPattern = Regex("\\[[^]]+]|@([\\w\\u4e00-\\u9fa5_-]+)")
+                if (emotes.isNotEmpty() || members.isNotEmpty() || topicPattern.containsMatchIn(part)) {
+                    val tokenPattern = Regex("\\[[^]]+]|@([\\w\\u4e00-\\u9fa5_-]+)|#([^#\\n]+)#")
                     var lastIdx = 0
                     for (match in tokenPattern.findAll(part)) {
                         val token = match.value
@@ -103,6 +104,16 @@ fun parseRichText(
                                 pop()
                                 lastIdx = match.range.last + 1
                             }
+                        } else if (token.startsWith("#")) {
+                            // Topic
+                            val topic = match.groupValues[2]
+                            append(part.substring(lastIdx, match.range.first))
+                            pushStringAnnotation(tag = "TOPIC", annotation = topic)
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary)) {
+                                append(token)
+                            }
+                            pop()
+                            lastIdx = match.range.last + 1
                         }
                     }
                     if (lastIdx < part.length) {

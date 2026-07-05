@@ -25,7 +25,24 @@ object OpusApi {
         @SerializedName("module_author") val module_author: DynamicApi.DynamicAuthor? = null,
         @SerializedName("module_dynamic") val module_dynamic: DynamicApi.DynamicContent? = null,
         @SerializedName("module_stat") val module_stat: DynamicApi.StatModule? = null,
-        @SerializedName("module_content") val module_content: OpusContentModule? = null
+        @SerializedName("module_content") val module_content: OpusContentModule? = null,
+        @SerializedName("module_top") val module_top: TopModule? = null
+    )
+
+    internal data class TopModule(
+        @SerializedName("display") val display: TopDisplay? = null
+    )
+
+    internal data class TopDisplay(
+        @SerializedName("album") val album: TopAlbum? = null
+    )
+
+    internal data class TopAlbum(
+        @SerializedName("pics") val pics: List<TopPic>? = null
+    )
+
+    internal data class TopPic(
+        @SerializedName("url") val url: String? = null
     )
 
     internal data class OpusContentModule(
@@ -104,22 +121,37 @@ object OpusApi {
                 return@withContext null
             }
             val jsonStr = html.substring(jsonStart, endIdx)
-            android.util.Log.d("BiliApi", "getOpus json=${jsonStr.take(300)}")
+            // 分段输出完整 JSON，logcat 单条上限约 4000 字符
+            val tag = "OpusApi"
+            val chunkSize = 3000
+            for (i in jsonStr.indices step chunkSize) {
+                val chunk = jsonStr.substring(i, minOf(i + chunkSize, jsonStr.length))
+                android.util.Log.d(tag, "Raw JSON [$i]: $chunk")
+            }
             val root = com.google.gson.JsonParser.parseString(jsonStr).asJsonObject
             val rawItem = findOpusItem(root)
             if (rawItem == null) {
                 android.util.Log.w("BiliApi", "getOpus could not find opus item in JSON")
                 return@withContext null
             }
-            android.util.Log.d("BiliApi", "getOpus parsed: type=${rawItem.type} modules=${rawItem.modules != null} id=${rawItem.id_str}")
-            parseOpusFromHtml(rawItem, id)
+            // 尝试从根级 opus.content.paragraphs 提取富文本段落
+            val rootOpusParas = try {
+                root.getAsJsonObject("opus")
+                    ?.getAsJsonObject("content")
+                    ?.getAsJsonArray("paragraphs")?.let { arr ->
+                        val listType = object : TypeToken<List<ParagraphData>>() {}.type
+                        GsonConfig.gson.fromJson<List<ParagraphData>>(arr, listType)
+                    }
+            } catch (_: Exception) { null }
+            android.util.Log.d("BiliApi", "getOpus parsed: type=${rawItem.type} modules=${rawItem.modules != null} id=${rawItem.id_str} rootOpusParas=${rootOpusParas?.size}")
+            parseOpusFromHtml(rawItem, id, rootOpusParas)
         } catch (e: Exception) {
             android.util.Log.e("BiliApi", "getOpus parse error: ${e.message}")
             null
         }
     }
 
-    private fun parseOpusFromHtml(item: OpusRawItem, id: Long): Opus {
+    private fun parseOpusFromHtml(item: OpusRawItem, id: Long, rootOpusParas: List<ParagraphData>? = null): Opus {
         val dynId = item.id_str?.toLongOrNull() ?: id
         val type = item.type
 
@@ -146,6 +178,22 @@ object OpusApi {
         if (majorType == "MAJOR_TYPE_DRAW") {
             majorObj?.draw?.items?.forEach { drawItem ->
                 drawItem.src?.fixUrl()?.let { topImages.add(it) }
+            }
+        }
+        
+        // 如果 module_top 里有 album pics，也加入到 topImages
+        modules?.module_top?.display?.album?.pics?.forEach { pic ->
+            pic.url?.fixUrl()?.takeIf { it.isNotEmpty() }?.let { topImages.add(it) }
+        }
+
+        // 如果 modules 中没有图片，从根级 opus.content.paragraphs 提取
+        if (topImages.isEmpty() && rootOpusParas != null) {
+            for (p in rootOpusParas) {
+                if (p.para_type == OpusParagraph.TYPE_PIC) {
+                    p.pic?.pics?.forEach { pic ->
+                        pic.url?.fixUrl()?.takeIf { it.isNotEmpty() }?.let { topImages.add(it) }
+                    }
+                }
             }
         }
 
@@ -180,6 +228,11 @@ object OpusApi {
         val contentModule = modules?.module_content
         if (contentModule?.paragraphs != null) {
             parsedParagraphs.addAll(parseParagraphsArray(contentModule.paragraphs))
+        }
+
+        // 如果 module_content 中没有段落，从根级 opus.content.paragraphs 补充
+        if (parsedParagraphs.isEmpty() && rootOpusParas != null) {
+            parsedParagraphs.addAll(parseParagraphsArray(rootOpusParas))
         }
 
         if (parsedParagraphs.isEmpty()) {
@@ -315,6 +368,7 @@ object OpusApi {
         var dynamic: DynamicApi.DynamicContent? = null
         var stat: DynamicApi.StatModule? = null
         var content: OpusContentModule? = null
+        var top: TopModule? = null
         for (m in el.asJsonArray) {
             if (!m.isJsonObject) continue
             val obj = m.asJsonObject
@@ -323,9 +377,10 @@ object OpusApi {
                 "MODULE_TYPE_DYNAMIC", "module_dynamic" -> dynamic = GsonConfig.gson.fromJson(obj.get("module_dynamic") ?: obj, DynamicApi.DynamicContent::class.java)
                 "MODULE_TYPE_STAT", "module_stat" -> stat = GsonConfig.gson.fromJson(obj.get("module_stat") ?: obj, DynamicApi.StatModule::class.java)
                 "MODULE_TYPE_CONTENT", "module_content" -> content = GsonConfig.gson.fromJson(obj.get("module_content") ?: obj, OpusContentModule::class.java)
+                "MODULE_TYPE_TOP" -> top = GsonConfig.gson.fromJson(obj.get("module_top") ?: obj, TopModule::class.java)
             }
         }
-        return OpusModules(author, dynamic, stat, content)
+        return OpusModules(author, dynamic, stat, content, top)
     }
 
     private fun findOpusItem(root: com.google.gson.JsonObject): OpusRawItem? {
@@ -346,7 +401,7 @@ object OpusApi {
         startsWith("//") -> "https:$this"
         startsWith("http://") -> replaceFirst("http://", "https://")
         else -> this
-    }
+    }.replace(".avif", ".webp")
 
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.95 Safari/537.36"
 }

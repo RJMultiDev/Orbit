@@ -652,6 +652,51 @@ fun PlayerScreen(
                     }
                 )
             }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        var isUp = false
+                        while (!isUp) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            if (event.changes.any { it.changedToUp() }) isUp = true
+                        }
+                        true
+                    }
+                    if (up != null) {
+                        val down2 = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                            awaitFirstDown(requireUnconsumed = false)
+                        }
+                        if (down2 != null) {
+                            var isZooming = false
+                            var lastY = down2.position.y
+                            val startY = down2.position.y
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Main)
+                                val changes = event.changes
+                                val ptr = changes.firstOrNull { it.id == down2.id }
+                                if (ptr == null || !ptr.pressed) break
+                                
+                                if (!isZooming) {
+                                    val dy = ptr.position.y - startY
+                                    if (kotlin.math.abs(dy) > viewConfiguration.touchSlop) {
+                                        isZooming = true
+                                    }
+                                }
+                                if (isZooming) {
+                                    if (SharedPreferencesUtil.getBoolean("player_one_finger_zoom", false)) {
+                                        val dy = ptr.position.y - lastY
+                                        val zoomFactor = 1f + dy * 0.005f
+                                        scale = (scale * zoomFactor).coerceIn(1f, 5f)
+                                        lastY = ptr.position.y
+                                        ptr.consume()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             .onRotaryScrollEvent {
                 if (isPrepared) {
                     val delta = it.verticalScrollPixels

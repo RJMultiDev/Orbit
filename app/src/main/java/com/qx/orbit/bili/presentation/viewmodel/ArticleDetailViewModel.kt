@@ -25,6 +25,9 @@ class ArticleDetailViewModel : ViewModel() {
     private val _isReplyLoading = MutableStateFlow(false)
     val isReplyLoading: StateFlow<Boolean> = _isReplyLoading.asStateFlow()
 
+    private val _replyCount = MutableStateFlow(0)
+    val replyCount: StateFlow<Int> = _replyCount.asStateFlow()
+
     private val _emotes = MutableStateFlow<List<EmoteApi.EmotePackage>?>(null)
     val emotes: StateFlow<List<EmoteApi.EmotePackage>?> = _emotes.asStateFlow()
 
@@ -55,6 +58,9 @@ class ArticleDetailViewModel : ViewModel() {
             try {
                 val data = _article.value ?: return@launch
                 val result = ReplyApi.getRepliesLazy(data.id, 0, replyNext, 12, 1)
+                if (replyNext == null) {
+                    _replyCount.value = result.first
+                }
                 replyNext = result.second
                 hasMoreReplies = result.second != null && result.second?.isNotBlank() == true
                 _replies.value = _replies.value + result.third

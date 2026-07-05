@@ -1,7 +1,10 @@
 package com.qx.orbit.bili.data.model
 
 import com.google.gson.annotations.SerializedName
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 
+@Parcelize
 data class UserInfo(
     @SerializedName(value = "mid") val mid: Long = 0,
     @SerializedName(value = "name", alternate = ["uname"]) val name: String = "",
@@ -26,4 +29,4 @@ data class UserInfo(
     val live_room: LiveRoom? = null,
     val is_senior_member: Int = 0,
     val is_follow_display: Boolean = false
-)
+) : Parcelable

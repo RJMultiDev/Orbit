@@ -297,13 +297,27 @@ object VideoInfoApi {
         val collection = data.ugc_season?.let { analyzeUgcSeason(it) }
 
         return VideoInfo(
-            title = data.title ?: "", cover = data.pic ?: "", bvid = data.bvid ?: "",
-            aid = data.aid, description = description, descAts = descAts,
-            duration = StringUtil.toTime(data.duration), stats = stats, timeDesc = timeDesc,
-            copyright = data.copyright, pagenames = pagenames, cids = cids,
-            upowerExclusive = data.is_upower_exclusive, argueMsg = data.argue_info?.argue_msg,
-            isCooperation = isCooperation, isSteinGate = isSteinGate, is360 = is360,
-            staff = staff, epid = epid, collection = collection
+            bvid = data.bvid ?: "",
+            aid = data.aid,
+            title = data.title ?: "",
+            staff = staff,
+            cover = data.pic ?: "",
+            description = description,
+            duration = StringUtil.toTime(data.duration),
+            stats = stats,
+            timeDesc = timeDesc,
+            pagenames = pagenames,
+            cids = cids,
+            descAts = descAts,
+            upowerExclusive = data.is_upower_exclusive,
+            argueMsg = data.argue_info?.argue_msg,
+            isCooperation = isCooperation,
+            isSteinGate = isSteinGate,
+            is360 = is360,
+            epid = epid,
+            copyright = data.copyright,
+            collection = collection,
+            history = null
         )
     }
 

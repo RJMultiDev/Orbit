@@ -8,6 +8,7 @@ import com.qx.orbit.bili.data.api.RecommendApi
 import com.qx.orbit.bili.data.api.ReplyApi
 import com.qx.orbit.bili.data.api.VideoInfoApi
 import com.qx.orbit.bili.data.model.Reply
+import com.qx.orbit.bili.data.api.PlayerApi
 import com.qx.orbit.bili.data.model.VideoCard
 import com.qx.orbit.bili.data.model.VideoInfo
 import com.qx.orbit.bili.data.api.EmoteApi
@@ -73,7 +74,18 @@ class VideoDetailViewModel : ViewModel() {
                 val tagsDeferred = async { VideoInfoApi.getTags(bvid) }
                 val relatedDeferred = async { RecommendApi.getRelated(aid) }
                 
-                _videoInfo.value = infoDeferred.await()
+                val info = infoDeferred.await() ?: throw Exception("视频信息加载失败")
+                if (info.cids.isNotEmpty()) {
+                    try {
+                        val history = PlayerApi.getHistoryProgress(info.aid, info.cids.first())
+                        _videoInfo.value = info.copy(history = history)
+                    } catch (e: Exception) {
+                        _videoInfo.value = info
+                    }
+                } else {
+                    _videoInfo.value = info
+                }
+
                 _tags.value = tagsDeferred.await()
                 _relatedVideos.value = relatedDeferred.await()
                 

@@ -36,11 +36,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Cached
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Recommend
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -330,15 +335,12 @@ fun WearApp(viewModel: MainViewModel = viewModel()) {
                     val followListViewModel: FollowListViewModel = viewModel()
                     FollowListScreen(viewModel = followListViewModel, navController = navController)
                 }
-                composable(
-                    "reply_detail/{rpid}/{replyJson}",
-                    arguments = listOf(
-                        navArgument("rpid") { type = NavType.LongType },
-                        navArgument("replyJson") { type = NavType.StringType }
-                    )
-                ) { backStackEntry ->
-                    val json = backStackEntry.arguments?.getString("replyJson") ?: ""
-                    val reply = Gson().fromJson(json, Reply::class.java)
+                composable("history") {
+                    val historyViewModel: com.qx.orbit.bili.presentation.viewmodel.HistoryViewModel = viewModel()
+                    com.qx.orbit.bili.presentation.HistoryScreen(viewModel = historyViewModel, navController = navController)
+                }
+                composable("reply_detail") {
+                    val reply = navController.previousBackStackEntry?.savedStateHandle?.get<Reply>("reply")
                     val replyDetailViewModel: ReplyDetailViewModel = viewModel()
                     if (reply != null) {
                         ReplyDetailScreen(reply = reply, viewModel = replyDetailViewModel, navController = navController)
@@ -597,14 +599,14 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
                                     when (tab) {
                                         TabMode.RECOMMEND -> {
                                             Icon(
-                                                imageVector = Icons.Default.Favorite,
+                                                imageVector = Icons.Default.Recommend,
                                                 modifier = Modifier.size(20.dp),
                                                 contentDescription = tab.title
                                             )
                                         }
                                         TabMode.POPULAR -> {
                                             Icon(
-                                                imageVector = Icons.Default.Star,
+                                                imageVector = Icons.Default.LocalFireDepartment,
                                                 modifier = Modifier.size(20.dp),
                                                 contentDescription = tab.title
                                             )
@@ -636,7 +638,7 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
                                         .transformedHeight(this, menuTransformationSpec),
                                     transformation = SurfaceTransformation(menuTransformationSpec)
                                 ) {
-                                    Icon(Icons.Default.Download, modifier = Modifier.size(20.dp), contentDescription = "缓存管理")
+                                    Icon(Icons.Default.Cached, modifier = Modifier.size(20.dp), contentDescription = "缓存管理")
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("缓存")
                                 }
@@ -656,9 +658,29 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
                                         .transformedHeight(this, menuTransformationSpec),
                                     transformation = SurfaceTransformation(menuTransformationSpec)
                                 ) {
-                                    Icon(Icons.Default.Favorite, modifier = Modifier.size(20.dp), contentDescription = "追番列表")
+                                    Icon(Icons.Default.Movie, modifier = Modifier.size(20.dp), contentDescription = "追番列表")
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("追番")
+                                }
+                            }
+                            item {
+                                Button(
+                                    onClick = {
+                                        showTabMenu = false
+                                        navController.navigate("history")
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .transformedHeight(this, menuTransformationSpec),
+                                    transformation = SurfaceTransformation(menuTransformationSpec)
+                                ) {
+                                    Icon(Icons.Default.History, modifier = Modifier.size(20.dp), contentDescription = "历史记录")
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("历史")
                                 }
                             }
                             item {

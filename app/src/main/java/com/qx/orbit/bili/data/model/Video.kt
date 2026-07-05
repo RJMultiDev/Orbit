@@ -22,7 +22,8 @@ data class VideoInfo(
     val is360: Boolean = false,
     val epid: Long = -1,
     val copyright: Int = 0,
-    val collection: Collection? = null
+    val collection: Collection? = null,
+    val history: History? = null
 ) {
     companion object {
         const val COPYRIGHT_SELF = 1
@@ -40,7 +41,8 @@ data class VideoCard(
     val bvid: String = "",
     val cid: Long = 0,
     val mid: Long = 0,
-    val seasonId: Long = 0
+    val seasonId: Long = 0,
+    val progressPercent: Float? = null
 )
 
 data class Stats(
@@ -96,3 +98,8 @@ object StringUtil {
         }
     }
 }
+
+data class History(
+    val cid: Long = 0,
+    val progress: Int = 0
+)
