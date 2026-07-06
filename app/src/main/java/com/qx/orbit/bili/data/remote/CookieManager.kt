@@ -22,6 +22,12 @@ object CookieManager {
     }
     fun setMid(mid: Long) = prefs.edit().putLong("mid", mid).apply()
 
+    fun getRefreshToken(): String {
+        val token = getInfoFromCookie("refresh_token")
+        if (token.isNotEmpty()) return token
+        return getInfoFromCookie("ac_time_value")
+    }
+
     fun getInfoFromCookie(name: String): String {
         val cookie = getCookie()
         cookie.split("; ").forEach { part ->

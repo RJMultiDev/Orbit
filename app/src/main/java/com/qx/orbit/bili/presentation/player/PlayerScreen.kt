@@ -70,6 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -927,12 +928,14 @@ fun PlayerScreen(
             ) {
                 Text(
                     text = playerData.title,
-                    color = Color.White,
-                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = 24.dp, start = 24.dp, end = 24.dp)
+                        .padding(top = 20.dp)
+                        .padding(horizontal = 32.dp)
                         .clickable { onBack() }
                         .basicMarquee()
                 )

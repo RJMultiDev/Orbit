@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -356,34 +359,28 @@ fun SettingPreferenceScreen(navController: NavController) {
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(
+                    colors = if (hasPermission){
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    else{
+                        ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        contentColor = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    ),
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )},
+                    transformation = SurfaceTransformation(transformationSpec),
                     modifier = Modifier
                         .fillMaxWidth()
                         .transformedHeight(this, transformationSpec)
-                        .graphicsLayer {
-                            with(transformationSpec) {
-                                applyContainerTransformation(scrollProgress)
-                            }
-                        }
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "所有文件访问权限", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                text = "缓存弹幕和字幕的必要权限",
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
+                        Text(text = "所有文件访问权限", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (hasPermission) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(Icons.Default.Check, contentDescription = "Granted", modifier = Modifier.size(16.dp))
@@ -391,6 +388,7 @@ fun SettingPreferenceScreen(navController: NavController) {
                     }
                 }
             }
+            item { Spacer(Modifier.height(20.dp)) }
         }
     }
 }
@@ -635,6 +633,8 @@ fun SettingUIScreen(navController: NavController) {
 @Composable
 fun SettingLoginStatusScreen(navController: NavController) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
     val listState = rememberTransformingLazyColumnState()
     val transformationSpec = rememberTransformationSpec()
     val context = LocalContext.current
@@ -695,6 +695,43 @@ fun SettingLoginStatusScreen(navController: NavController) {
                         }
                 ) {
                     Text(text = "导出 Cookie", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+
+            item {
+                Button(
+                    onClick = {
+                        if (isRefreshing) return@Button
+                        isRefreshing = true
+                        RoundToast.show(context, "正在刷新 Cookie...")
+                        coroutineScope.launch {
+                            val result = com.qx.orbit.bili.data.api.CookieRefreshApi.doCookieRefresh(auto = false)
+                            RoundToast.show(context, result.message)
+                            isRefreshing = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .transformedHeight(this, transformationSpec)
+                        .graphicsLayer {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(text = "手动刷新 Cookie", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
 

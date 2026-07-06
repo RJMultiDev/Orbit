@@ -34,3 +34,8 @@ data class TvCookie(
     @SerializedName("http_only") val httpOnly: Int = 0,
     @SerializedName("expires") val expires: Long = 0,
 )
+
+data class TvRefreshData(
+    @SerializedName("token_info") val tokenInfo: TvTokenInfo? = null,
+    @SerializedName("cookie_info") val cookieInfo: TvCookieInfo? = null,
+)

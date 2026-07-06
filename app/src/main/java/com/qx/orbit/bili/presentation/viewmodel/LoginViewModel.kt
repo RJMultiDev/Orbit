@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.qx.orbit.bili.data.api.LoginApi
+import com.qx.orbit.bili.data.remote.CookieManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,6 +60,11 @@ class LoginViewModel : ViewModel() {
                     val pollData = LoginApi.getLoginState(qrcodeKey)
                     when (pollData.code) {
                         0 -> {
+                            pollData.refresh_token?.let {
+                                if (it.isNotEmpty()) {
+                                    CookieManager.putCookie("refresh_token", it)
+                                }
+                            }
                             _state.value = LoginState.Success
                             break
                         }

@@ -43,6 +43,9 @@ class MainViewModel : ViewModel() {
                 if (!com.qx.orbit.bili.data.remote.CookieManager.getCookie().contains("buvid3")) {
                     com.qx.orbit.bili.data.api.CookiesApi.checkCookies()
                 }
+                if (com.qx.orbit.bili.data.remote.CookieManager.getCookie().contains("SESSDATA")) {
+                    launch { com.qx.orbit.bili.data.api.CookieRefreshApi.doCookieRefresh(auto = true) }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

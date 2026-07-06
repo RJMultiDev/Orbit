@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -156,7 +157,7 @@ fun FollowListScreen(
                                 Icon(imageVector = Icons.Default.Delete, contentDescription = "取消追番")
                             },
                             text = { Text("取消追番") },
-                            modifier = Modifier.height(SwipeToRevealDefaults.LargeActionButtonHeight)
+                            modifier = Modifier.fillMaxHeight()
                         )
                     },
                     onSwipePrimaryAction = {

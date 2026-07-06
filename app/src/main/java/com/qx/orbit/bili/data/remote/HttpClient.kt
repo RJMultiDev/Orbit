@@ -64,12 +64,18 @@ object HttpClient {
     private class CookieAddInterceptor : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val request = chain.request()
-            val cookie = CookieManager.getCookie()
-            if (cookie.isEmpty() || request.header("Cookie") != null) {
+            val rawCookie = CookieManager.getCookie()
+            if (rawCookie.isEmpty() || request.header("Cookie") != null) {
                 return chain.proceed(request)
             }
+            // 过滤掉自定义的无关字段，防止被 B站 WAF 拦截
+            val cleanCookie = rawCookie.split("; ").filter { 
+                val key = it.substringBefore("=")
+                key != "refresh_token" && key != "access_token" && key != "expires_in" && key != "mid"
+            }.joinToString("; ")
+            
             val newRequest = request.newBuilder()
-                .addHeader("Cookie", cookie)
+                .addHeader("Cookie", cleanCookie)
                 .build()
             return chain.proceed(newRequest)
         }

@@ -200,22 +200,17 @@ fun ArticleContentPage(
     , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
         if (item.title.isNotEmpty()) {
             item {
-                Box(
-                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec).graphicsLayer {
-                        if (isRound) {
-                            with(transformationSpec) {
-                                applyContainerTransformation(scrollProgress)
-                            }
-                        }
-                    }
+                ListHeader(
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
+                    transformation = SurfaceTransformation(transformationSpec)
                 ) {
                     Text(
                         text = item.title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }

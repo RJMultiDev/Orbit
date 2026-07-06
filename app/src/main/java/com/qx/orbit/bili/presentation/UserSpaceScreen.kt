@@ -308,8 +308,11 @@ fun UserVideosPage(
                 modifier = Modifier.fillMaxSize()
             , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
             item {
-                ListHeader {
-                    Text(text = "发布的视频")
+                ListHeader(
+                    modifier = Modifier.transformedHeight(this, transformationSpec),
+                    transformation = SurfaceTransformation(transformationSpec),
+                ) {
+                    Text("发布的视频", color = MaterialTheme.colorScheme.primary)
                 }
             }
             itemsIndexed(videos) { index, item ->
@@ -328,7 +331,8 @@ fun UserVideosPage(
                     )
                 }
             }
-        }
+                item { Spacer(Modifier.height(24.dp)) }
+            }
         }
     }
 }
@@ -355,8 +359,11 @@ fun UserArticlesPage(
                 modifier = Modifier.fillMaxSize()
             , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
             item {
-                ListHeader {
-                    Text(text = "发布的图文")
+                ListHeader(
+                    modifier = Modifier.transformedHeight(this, transformationSpec),
+                    transformation = SurfaceTransformation(transformationSpec),
+                ) {
+                    Text("发布的图文", color = MaterialTheme.colorScheme.primary)
                 }
             }
             itemsIndexed(articles) { index, item ->
@@ -365,7 +372,7 @@ fun UserArticlesPage(
                         viewModel.loadMoreArticles()
                     }
                 }
-                Box(modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp).transformedHeight(this@itemsIndexed, transformationSpec)) {
+                Box(modifier = Modifier.transformedHeight(this@itemsIndexed, transformationSpec)) {
                     ArticleCardItem(
                         item = item, 
                         onClick = {
@@ -375,6 +382,7 @@ fun UserArticlesPage(
                     )
                 }
             }
+                item { Spacer(Modifier.height(24.dp)) }
         }
         }
     }

@@ -1191,7 +1191,10 @@ fun VideoCommentsPage(
             contentPadding = contentPadding
         , rotaryScrollableBehavior = rememberSafeRotaryScrollableBehavior(listState)) {
             item {
-                ListHeader{
+                ListHeader(
+                    modifier = Modifier.transformedHeight(this, transformationSpec),
+                    transformation = SurfaceTransformation(transformationSpec)
+                ){
                     Text(
                         "评论(${formatCount(replyCount)})",
                         style = MaterialTheme.typography.titleMedium,

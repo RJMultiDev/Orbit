@@ -476,6 +476,14 @@ interface BiliApiService {
     suspend fun getLoginQr(): Result<JsonElement>
 
     @FormUrlEncoded
+    @AppSign
+    @POST("https://passport.bilibili.com/api/v2/oauth2/refresh_token")
+    suspend fun refreshTvToken(
+        @Field("access_key") accessKey: String,
+        @Field("refresh_token") refreshToken: String
+    ): Result<JsonElement>
+
+    @FormUrlEncoded
     @POST("https://passport.bilibili.com/x/passport-login/web/sso/list")
     suspend fun requestSSOs(): Result<JsonElement>
 
