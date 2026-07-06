@@ -16,8 +16,8 @@ android {
         applicationId = "com.qx.orbit.bili"
         minSdk = 23
         targetSdk = 36
-        versionCode = 501
-        versionName = "0.5.1-Alpha"
+        versionCode = 502
+        versionName = "0.5.2-Alpha"
         resValue("string", "app_verCode", versionCode.toString())
         resValue("string", "app_version", versionName.toString())
     }
@@ -45,7 +45,7 @@ android {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86")
+            include("armeabi-v7a", "arm64-v8a")
             isUniversalApk = true
         }
     }
@@ -121,6 +121,9 @@ dependencies {
 
     // PhotoView (for image viewer)
     implementation(libs.photoview)
+
+    // Horologist Audio UI
+    implementation(libs.horologist.audio.ui)
 
     // EventBus
     implementation(libs.eventbus)

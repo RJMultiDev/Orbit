@@ -78,7 +78,7 @@ object RecommendApi {
                 val apiResp: ApiResponse<PopularResponse>? = GsonConfig.gson.fromJson(resp.data, type)
                 apiResp?.data?.list?.filterNotNull()?.map { it.toVideoCard() } ?: emptyList()
             }
-            is Result.Error -> emptyList()
+            is Result.Error -> throw resp.exception
         }
     }
 

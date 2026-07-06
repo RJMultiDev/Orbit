@@ -1,7 +1,10 @@
 package com.qx.orbit.bili.presentation.player
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.ActivityInfo
 import android.graphics.SurfaceTexture
+import android.media.AudioManager
 import android.util.Log
 import android.view.Gravity
 import android.view.Surface
@@ -21,6 +24,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +41,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -54,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -67,10 +73,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.net.toUri
+import androidx.wear.compose.material.dialog.Dialog
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
+import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import com.google.android.horologist.annotations.ExperimentalHorologistApi
+import com.google.android.horologist.audio.ui.material3.VolumeScreen
 import com.qx.orbit.bili.R
 import com.qx.orbit.bili.data.api.CookiesApi
 import com.qx.orbit.bili.data.api.DanmakuApi
@@ -80,28 +91,30 @@ import com.qx.orbit.bili.data.api.LiveApi
 import com.qx.orbit.bili.data.api.PlayerApi
 import com.qx.orbit.bili.data.model.PlayerData
 import com.qx.orbit.bili.data.remote.CookieManager
+import com.qx.orbit.bili.presentation.ui.components.findActivity
+import com.qx.orbit.bili.presentation.viewmodel.EmoteInline
 import com.qx.orbit.bili.util.SharedPreferencesUtil
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import master.flame.danmaku.danmaku.loader.android.*
-import master.flame.danmaku.danmaku.model.android.*
-import master.flame.danmaku.danmaku.parser.android.*
-import master.flame.danmaku.danmaku.parser.*
+import master.flame.danmaku.danmaku.loader.android.DanmakuLoaderFactory
+import master.flame.danmaku.danmaku.model.android.DanmakuContext
+import master.flame.danmaku.danmaku.model.android.Danmakus
+import master.flame.danmaku.danmaku.parser.BaseDanmakuParser
+import master.flame.danmaku.danmaku.parser.android.BiliDanmukuParser
+import master.flame.danmaku.danmaku.parser.android.BiliProtobufDanmakuParser
 import master.flame.danmaku.ui.widget.DanmakuView
-import tv.danmaku.ijk.media.player.IjkMediaPlayer
-import kotlin.time.Duration.Companion.seconds
-import androidx.core.net.toUri
-import androidx.wear.compose.material3.MaterialTheme
-import com.qx.orbit.bili.presentation.viewmodel.EmoteInline
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.WebSocket
+import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 @Suppress("unused")
-@OptIn(DelicateCoroutinesApi::class)
+@OptIn(ExperimentalHorologistApi::class, DelicateCoroutinesApi::class)
+@SuppressLint("DefaultLocale")
 @Composable
 fun PlayerScreen(
     initialData: PlayerData,
@@ -120,6 +133,28 @@ fun PlayerScreen(
     val isLocal = playerData.type == PlayerData.TYPE_LOCAL
     var showDanmaku by remember { mutableStateOf(SharedPreferencesUtil.getBoolean("player_danmaku_default_show", true)) }
     var isPlaying by remember { mutableStateOf(false) }
+    
+    val leftBtnAction by remember { mutableIntStateOf(SharedPreferencesUtil.getInt("player_custom_btn_left", 2)) }
+    val rightBtnAction by remember { mutableIntStateOf(SharedPreferencesUtil.getInt("player_custom_btn_right", 1)) }
+    var showVolumeScreen by remember { mutableStateOf(false) }
+    val volumeFocusRequester = remember { FocusRequester() }
+
+    val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    
+    val isAutoLandscape = remember { SharedPreferencesUtil.getBoolean("player_autolandscape", false) }
+    DisposableEffect(isAutoLandscape) {
+        val activity = context.findActivity()
+        val originalOrientation = activity?.requestedOrientation
+        if (isAutoLandscape && activity != null) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+        onDispose {
+            if (isAutoLandscape && activity != null && originalOrientation != null) {
+                activity.requestedOrientation = originalOrientation
+            }
+        }
+    }
+
     var isPrepared by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
     var showControls by remember { mutableStateOf(true) }
@@ -574,47 +609,6 @@ fun PlayerScreen(
                 }
             }
             .pointerInput(Unit) {
-                var wasLongPress: Boolean
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val timeout = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                        var isUp = false
-                        while (!isUp) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.changes.any { it.changedToUp() }) isUp = true
-                        }
-                    }
-                    if (timeout == null) {
-                        wasLongPress = true
-                        if (isPlaying && !showControls && !isLive && SharedPreferencesUtil.getBoolean("player_longclick", true)) isLongPressSpeedUp = true
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.changes.any { it.changedToUp() }) {
-                                isLongPressSpeedUp = false
-                                break
-                            }
-                        }
-                    } else {
-                        wasLongPress = false
-                        val upEvent = currentEvent.changes.firstOrNull()
-                        val upTime = upEvent?.uptimeMillis ?: 0L
-                        val downTime = down.uptimeMillis
-                        val duration = upTime - downTime
-                        if (duration < viewConfiguration.longPressTimeoutMillis && duration > 0) {
-                            val downPos = down.position
-                            val upPos = upEvent?.position ?: downPos
-                            val dist = (upPos - downPos).getDistance()
-                            if (dist < viewConfiguration.touchSlop) {
-                                if (!wasLongPress) {
-                                    if (showControls) showControls = false
-                                    else interactionCounter++
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
                         if (isPlaying) {
@@ -651,6 +645,47 @@ fun PlayerScreen(
                         interactionCounter++
                     }
                 )
+            }
+            .pointerInput(Unit) {
+                var wasLongPress: Boolean
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val timeout = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        var isUp = false
+                        while (!isUp) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            if (event.changes.any { it.changedToUp() }) isUp = true
+                        }
+                    }
+                    if (timeout == null) {
+                        wasLongPress = true
+                        if (isPlaying && !showControls && !isLive && SharedPreferencesUtil.getBoolean("player_longclick", true)) isLongPressSpeedUp = true
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            if (event.changes.any { it.changedToUp() }) {
+                                isLongPressSpeedUp = false
+                                break
+                            }
+                        }
+                    } else {
+                        wasLongPress = false
+                        val upEvent = currentEvent.changes.firstOrNull()
+                        val upTime = upEvent?.uptimeMillis ?: 0L
+                        val downTime = down.uptimeMillis
+                        val duration = upTime - downTime
+                        if (duration < viewConfiguration.longPressTimeoutMillis && duration > 0) {
+                            val downPos = down.position
+                            val upPos = upEvent?.position ?: downPos
+                            val dist = (upPos - downPos).getDistance()
+                            if (dist < viewConfiguration.touchSlop) {
+                                if (!wasLongPress && upEvent?.isConsumed != true) {
+                                    if (showControls) showControls = false
+                                    else interactionCounter++
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -833,14 +868,21 @@ fun PlayerScreen(
         }
 
         errorMessage?.let {
-            Text(
-                text = it,
-                color = Color.White,
+            Row(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .background(Color(0x88000000))
-                    .padding(8.dp)
-            )
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50)),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ){
+                Text(
+                    text = it,
+                    color = Color.White,
+                    modifier = Modifier
+                        .background(Color(0x88000000))
+                        .padding(8.dp)
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -901,31 +943,67 @@ fun PlayerScreen(
                         .align(Alignment.Center)
                         .padding(horizontal = 24.dp)
                 ) {
-                    if (!isLive) {
-                        IconButton(
-                            onClick = {
-                                playbackSpeed = when (playbackSpeed) {
-                                    1.0f -> 1.5f
-                                    1.5f -> 2.0f
-                                    2.0f -> 0.5f
-                                    else -> 1.0f
+                    val renderCustomButton = @Composable { action: Int, modifier: Modifier ->
+                        when (action) {
+                            1 -> {
+                                IconButton(
+                                    onClick = { showDanmaku = !showDanmaku },
+                                    modifier = modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(if (showDanmaku) R.drawable.ic_danmaku_inline_switch_v2_on else R.drawable.ic_danmaku_inline_switch_v2_off),
+                                        contentDescription = "Toggle Danmaku",
+                                        tint = Color.Unspecified,
+                                        modifier = Modifier.size(36.dp)
+                                    )
                                 }
-                            },
-                            modifier = Modifier.align(Alignment.CenterStart).offset(x = (-16).dp).size(36.dp)
-                        ) {
-                            val iconRes = when (playbackSpeed) {
-                                0.5f -> R.drawable.speed_0_5x
-                                1.5f -> R.drawable.speed_1_5x
-                                2.0f -> R.drawable.speed_2x
-                                else -> R.drawable.speed_1x
                             }
-                            Icon(
-                                painter = painterResource(iconRes),
-                                contentDescription = "Playback Speed",
-                                tint = Color.White.copy(alpha = 0.9f),
-                                modifier = Modifier.size(28.dp)
-                            )
+                            2 -> {
+                                if (!isLive) {
+                                    IconButton(
+                                        onClick = {
+                                            playbackSpeed = when (playbackSpeed) {
+                                                1.0f -> 1.5f
+                                                1.5f -> 2.0f
+                                                2.0f -> 0.5f
+                                                else -> 1.0f
+                                            }
+                                        },
+                                        modifier = modifier.size(36.dp)
+                                    ) {
+                                        val iconRes = when (playbackSpeed) {
+                                            0.5f -> R.drawable.speed_0_5x
+                                            1.5f -> R.drawable.speed_1_5x
+                                            2.0f -> R.drawable.speed_2x
+                                            else -> R.drawable.speed_1x
+                                        }
+                                        Icon(
+                                            painter = painterResource(iconRes),
+                                            contentDescription = "Playback Speed",
+                                            tint = Color.White.copy(alpha = 0.9f),
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            3 -> {
+                                IconButton(
+                                    onClick = { showVolumeScreen = true },
+                                    modifier = modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Default.VolumeUp,
+                                        contentDescription = "Volume",
+                                        tint = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
                         }
+                    }
+
+                    if (leftBtnAction != 0) {
+                        renderCustomButton(leftBtnAction, Modifier.align(Alignment.CenterStart).offset(x = (-16).dp))
                     }
 
                     IconButton(
@@ -971,18 +1049,8 @@ fun PlayerScreen(
                         )
                     }
 
-                    if (SharedPreferencesUtil.getBoolean("player_ui_showDanmakuBtn", true)) {
-                        IconButton(
-                            onClick = { showDanmaku = !showDanmaku },
-                            modifier = Modifier.align(Alignment.CenterEnd).offset(x = 16.dp).size(36.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(if (showDanmaku) R.drawable.ic_danmaku_inline_switch_v2_on else R.drawable.ic_danmaku_inline_switch_v2_off),
-                                contentDescription = "Toggle Danmaku",
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
+                    if (rightBtnAction != 0) {
+                        renderCustomButton(rightBtnAction, Modifier.align(Alignment.CenterEnd).offset(x = 16.dp))
                     }
                 }
 
@@ -1034,6 +1102,38 @@ fun PlayerScreen(
                         )
                     }
                 }
+            }
+        }
+        
+        Dialog(
+            showDialog = showVolumeScreen,
+            onDismissRequest = { showVolumeScreen = false }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { change, dragAmount ->
+                            change.consume()
+                            if (dragAmount > 0) {
+                                audioManager.adjustStreamVolume(
+                                    AudioManager.STREAM_MUSIC,
+                                    AudioManager.ADJUST_LOWER,
+                                    0
+                                )
+                            } else if (dragAmount < 0) {
+                                audioManager.adjustStreamVolume(
+                                    AudioManager.STREAM_MUSIC,
+                                    AudioManager.ADJUST_RAISE,
+                                    0
+                                )
+                            }
+                        }
+                    }
+            ) {
+                VolumeScreen(
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }

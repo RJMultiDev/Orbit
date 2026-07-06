@@ -30,14 +30,6 @@ enum class HdQrStatus {
     REQUESTING, WAITING, SCANNED, LOGIN_SUCCESS, EXPIRED, ERROR
 }
 
-/**
- * HD 扫码登录 ViewModel。
- *
- * 迁移自 KiliKili `HdQrCodeLoginViewModel`,适配 Orbit 的单 cookie 串存储。
- * 不再懒启动;由页面 Composable 在 LaunchedEffect 中调用 [requestQrCode]。
- *
- * 登录成功后会调用 ExClimbWuzhi 激活 cookie,然后写入 CookieManager。
- */
 class HdQrCodeLoginViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(HdQrCodeState())
     val uiState: StateFlow<HdQrCodeState> = _uiState.asStateFlow()

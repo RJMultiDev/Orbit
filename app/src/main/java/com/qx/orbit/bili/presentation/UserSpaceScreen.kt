@@ -65,6 +65,7 @@ import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
 import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
 import com.qx.orbit.bili.presentation.viewmodel.UserSpaceViewModel
+import com.qx.orbit.bili.util.formatCount
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -233,7 +234,7 @@ fun UserDynamicsPage(
                             LevelIcon(level = info.level, isSenior = info.is_senior_member == 1)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = "粉丝: ${info.fans} · 关注: ${info.following}", fontSize = 12.sp, color = Color.Gray)
+                        Text(text = "${formatCount(info.fans)}粉丝  ${info.following}关注", fontSize = 12.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = info.sign,

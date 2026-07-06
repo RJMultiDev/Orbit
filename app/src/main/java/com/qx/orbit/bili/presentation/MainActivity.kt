@@ -121,6 +121,7 @@ import com.qx.orbit.bili.presentation.settings.SettingTerminalPlayerScreen
 import com.qx.orbit.bili.presentation.settings.SettingUIScreen
 import com.qx.orbit.bili.presentation.settings.SettingVideoRenderScreen
 import com.qx.orbit.bili.presentation.settings.SettingsScreen
+import com.qx.orbit.bili.presentation.settings.PlayerCustomizationScreen
 import com.qx.orbit.bili.presentation.theme.OrbitTheme
 import com.qx.orbit.bili.presentation.ui.components.LevelIcon
 import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
@@ -391,6 +392,9 @@ fun WearApp(viewModel: MainViewModel = viewModel()) {
             }
             composable("settings_terminal_player") {
                 SettingTerminalPlayerScreen(navController = navController)
+            }
+            composable("settings_player_customization") {
+                PlayerCustomizationScreen(onBack = { navController.popBackStack() })
             }
             composable("settings_video_render") {
                 SettingVideoRenderScreen(navController = navController)

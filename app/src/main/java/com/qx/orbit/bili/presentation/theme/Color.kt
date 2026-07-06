@@ -32,4 +32,4 @@ val wearColorScheme: ColorScheme =
         surfaceContainerHigh = Color(0xFF31282A),
     )
 
-val BiliPink = Color(0xFFfb8799)
+val BiliPink = Color(0xFFFB7299)

@@ -441,6 +441,26 @@ fun SettingTerminalPlayerScreen(navController: NavController) {
                 Triple("player_ui_showDanmakuBtn", "显示弹幕按钮", true)
             )
             item {
+                Button(
+                    onClick = { navController.navigate("settings_player_customization") },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .transformedHeight(this, transformationSpec)
+                        .graphicsLayer {
+                            with(transformationSpec) {
+                                applyContainerTransformation(scrollProgress)
+                            }
+                        }
+                ) {
+                    Text(text = "播放器自定义", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+
+            item {
                 val isLoggedIn = CookieManager.getCookie().contains("SESSDATA")
                 val qualityOptions = listOf(
                     16 to "360p",

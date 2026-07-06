@@ -17,7 +17,6 @@ import okhttp3.FormBody
 import okhttp3.Request
 import androidx.core.graphics.createBitmap
 
-/** LoginApi —— Web / HD 扫码登录端点 + Cookie 导入。 */
 object LoginApi {
 
     private val api by lazy { BiliApiService.create() }
@@ -117,8 +116,6 @@ object LoginApi {
     }
 
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.95 Safari/537.36"
-
-    // ===== HD / TV 扫码登录(KiliKili 迁入)=====
 
     suspend fun getTvAuthCode(): Result<JsonElement> = withContext(Dispatchers.IO) {
         api.getTvAuthCode()
