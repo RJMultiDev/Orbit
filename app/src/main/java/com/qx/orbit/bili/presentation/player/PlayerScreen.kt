@@ -21,6 +21,7 @@ import android.view.SurfaceView
 import android.view.TextureView
 import android.widget.FrameLayout
 import coil.imageLoader
+import coil.compose.AsyncImage
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -104,6 +105,7 @@ import com.qx.orbit.bili.data.api.LiveApi
 import com.qx.orbit.bili.data.api.PlayerApi
 import com.qx.orbit.bili.data.model.PlayerData
 import com.qx.orbit.bili.data.remote.CookieManager
+import com.qx.orbit.bili.presentation.ui.components.RoundToast
 import com.qx.orbit.bili.presentation.ui.components.findActivity
 import com.qx.orbit.bili.presentation.viewmodel.EmoteInline
 import com.qx.orbit.bili.service.PlayerForegroundService
@@ -135,11 +137,18 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onDisposeAction: (epid: Long, progress: Long) -> Unit = { _, _ -> }
 ) {
-    BackHandler {
-        onBack()
-    }
-    
     val context = LocalContext.current
+    var backPressedTime by remember { mutableLongStateOf(0L) }
+    
+    BackHandler {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - backPressedTime < 2000) {
+            onBack()
+        } else {
+            backPressedTime = currentTime
+            RoundToast.show(context, "再按一次返回键退出")
+        }
+    }
     val scope = rememberCoroutineScope()
     
     var playerData by remember { mutableStateOf(initialData) }
@@ -352,8 +361,7 @@ fun PlayerScreen(
                 .setContentText(if (isPlaying) "正在播放" else "已暂停")
                 .setOngoing(isPlaying)
                 .setCategory(Notification.CATEGORY_TRANSPORT)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .setStyle(Notification.MediaStyle().setMediaSession(mediaSession.sessionToken))
+                .setVisibility(Notification.VISIBILITY_PUBLIC).style = Notification.MediaStyle().setMediaSession(mediaSession.sessionToken)
             if (pendingIntent != null) {
                 builder.setContentIntent(pendingIntent)
             }
@@ -490,8 +498,10 @@ fun PlayerScreen(
                     val mergeDuplicates = SharedPreferencesUtil.getBoolean("player_danmaku_mergeduplicate", false)
                     val allowOverlap = SharedPreferencesUtil.getBoolean("player_danmaku_allowoverlap", true)
                     val maxLines = SharedPreferencesUtil.getInt("player_danmaku_maxline", 0)
+                    val enableAdvanced = SharedPreferencesUtil.getBoolean("player_danmaku_advanced_enable", true)
 
                     setDuplicateMergingEnabled(mergeDuplicates)
+                    setSpecialDanmakuVisibility(enableAdvanced)
                     
                     if (!allowOverlap) {
                         val overlappingPairs = mapOf(1 to true, 5 to true, 4 to true, 6 to true)
@@ -511,6 +521,8 @@ fun PlayerScreen(
                 danmakuView.enableDanmakuDrawingCache(true)
             } else if (isLocal) {
                 val ctx = DanmakuContext.create().apply {
+                    val enableAdvanced = SharedPreferencesUtil.getBoolean("player_danmaku_advanced_enable", true)
+                    setSpecialDanmakuVisibility(enableAdvanced)
                     setDuplicateMergingEnabled(false)
                     setScaleTextSize(0.8f)
                     setDanmakuTransparency(0.4f)
@@ -537,6 +549,8 @@ fun PlayerScreen(
                 danmakuView.enableDanmakuDrawingCache(true)
             } else {
                 val ctx = DanmakuContext.create().apply {
+                    val enableAdvanced = SharedPreferencesUtil.getBoolean("player_danmaku_advanced_enable", true)
+                    setSpecialDanmakuVisibility(enableAdvanced)
                     setDuplicateMergingEnabled(false)
                     setScaleTextSize(0.8f)
                     setDanmakuTransparency(0.4f)
@@ -721,6 +735,19 @@ fun PlayerScreen(
                                 item.textColor = color
                                 item.textSize = textSize * (context.resources.displayMetrics.density - 0.6f)
                                 item.time = danmakuView.currentTime + 100
+                                
+                                if (borderColor != 0) {
+                                    item.borderColor = borderColor
+                                }
+                                if (id.isNotEmpty()) {
+                                    item.userHash = id
+                                }
+                                if (singleEmote != null) {
+                                    item.obj = singleEmote
+                                } else if (emotes != null) {
+                                    item.obj = emotes
+                                }
+                                
                                 danmakuView.addDanmaku(item)
                             } catch (_: Exception) {}
                         }
@@ -790,8 +817,7 @@ fun PlayerScreen(
                         switchPendingSeekMs = mediaPlayer.currentPosition
                     } catch (e: Exception) {}
                     isAudioOnlyMode = false
-                }
-                if (!isAudioOnlyMode) {
+                } else {
                     if (useTextureView) {
                         if (textureSurface != null) mediaPlayer.setSurface(textureSurface)
                     } else {
@@ -918,17 +944,25 @@ fun PlayerScreen(
                         var isUp = false
                         while (!isUp) {
                             val event = awaitPointerEvent(PointerEventPass.Main)
-                            if (event.changes.any { it.changedToUp() }) isUp = true
+                            if (event.changes.any { !it.pressed || it.changedToUp() }) isUp = true
                         }
                     }
                     if (timeout == null) {
-                        wasLongPress = true
-                        if (isPlaying && !showControls && !isLive && SharedPreferencesUtil.getBoolean("player_longclick", true)) isLongPressSpeedUp = true
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Main)
-                            if (event.changes.any { it.changedToUp() }) {
+                        val timeSinceBack = System.currentTimeMillis() - backPressedTime
+                        if (timeSinceBack < 1000) {
+                            // Ghost pointer from system edge swipe, ignore it
+                        } else {
+                            wasLongPress = true
+                            if (isPlaying && !showControls && !isLive && SharedPreferencesUtil.getBoolean("player_longclick", true)) isLongPressSpeedUp = true
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Main)
+                                    if (event.changes.any { !it.pressed || it.changedToUp() }) {
+                                        break
+                                    }
+                                }
+                            } finally {
                                 isLongPressSpeedUp = false
-                                break
                             }
                         }
                     } else {
@@ -1029,7 +1063,18 @@ fun PlayerScreen(
             contentAlignment = Alignment.Center
         ) {
             // Video Surface - fit within round screen safe area by default
-            Box(modifier = Modifier.fillMaxSize(0.86524f)) {
+            Box(
+                modifier = Modifier.fillMaxSize(0.86524f),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isAudioOnlyMode || playerData.audioUrl == "audio") {
+                    AsyncImage(
+                        model = playerData.cover.replace("http://", "https://"),
+                        contentDescription = "Cover",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(0.65f).clip(RoundedCornerShape(16.dp))
+                    )
+                }
                 AndroidView(
                     factory = { ctx ->
                         if (useTextureView) {

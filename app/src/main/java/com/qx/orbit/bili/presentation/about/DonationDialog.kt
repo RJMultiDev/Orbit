@@ -106,7 +106,7 @@ fun DonationDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "捐赠请带上您的QQ号，我们可能会邀请您抢先参与内测体验",
+                    text = "捐赠请带上您的QQ号",
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.labelSmall,
                     textAlign = TextAlign.Center,

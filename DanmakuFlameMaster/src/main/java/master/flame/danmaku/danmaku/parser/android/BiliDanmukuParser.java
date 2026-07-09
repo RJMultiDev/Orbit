@@ -118,6 +118,10 @@ public class BiliDanmukuParser extends BaseDanmakuParser {
                     long time = (long) (Float.parseFloat(values[0]) * 1000); // 出现时间
                     int type = Integer.parseInt(values[1]); // 弹幕类型
                     
+                    boolean enableAdvanced = sharedPreferences == null || sharedPreferences.getBoolean("player_danmaku_advanced_enable", true);
+                    if (!enableAdvanced && (type == 7 || type == 8)) {
+                        type = 1;
+                    }
                     if(sharedPreferences != null && type != 7 && type != 8 && sharedPreferences.getBoolean("player_danmaku_forceR2L",false)) type = 1;
                     
                     float textSize = Float.parseFloat(values[2]); // 字体大小
@@ -151,7 +155,17 @@ public class BiliDanmukuParser extends BaseDanmakuParser {
         @Override
         public void characters(char[] ch, int start, int length)  {
             if (item != null) {
-                DanmakuUtils.fillText(item, decodeXmlString(new String(ch, start, length)));
+                String rawText = decodeXmlString(new String(ch, start, length));
+                boolean enableAdvanced = sharedPreferences == null || sharedPreferences.getBoolean("player_danmaku_advanced_enable", true);
+                if (!enableAdvanced && rawText.startsWith("[") && rawText.endsWith("]")) {
+                    try {
+                        JSONArray jsonArray = new JSONArray(rawText);
+                        if (jsonArray.length() >= 5) {
+                            rawText = jsonArray.getString(4);
+                        }
+                    } catch (Exception e) {}
+                }
+                DanmakuUtils.fillText(item, rawText);
                 item.index = index++;
 
                 // initial specail danmaku data

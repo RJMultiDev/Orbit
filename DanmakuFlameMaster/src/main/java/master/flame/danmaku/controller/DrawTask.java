@@ -234,6 +234,7 @@ public class DrawTask implements IDrawTask {
     @Override
     public void seek(long mills) {
         reset();
+        requestClear();
         mContext.mGlobalFlagValues.updateVisibleFlag();
         mContext.mGlobalFlagValues.updateFirstShownFlag();
         mStartRenderTime = mills < 1000 ? 0 : mills;

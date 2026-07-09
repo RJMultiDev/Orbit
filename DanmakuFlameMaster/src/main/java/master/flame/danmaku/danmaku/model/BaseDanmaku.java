@@ -89,7 +89,7 @@ public abstract class BaseDanmaku {
     /**
      * 下划线颜色,0表示无下划线
      */
-    public final int underlineColor = 0;
+    public int underlineColor = 0;
 
     /**
      * 字体大小
@@ -99,7 +99,7 @@ public abstract class BaseDanmaku {
     /**
      * 框的颜色,0表示无框
      */
-    public final int borderColor = 0;
+    public int borderColor = 0;
 
     /**
      * 内边距(像素)
@@ -140,6 +140,21 @@ public abstract class BaseDanmaku {
      * 重置位 visible
      */
     private int visibleResetFlag = 0;
+
+    /**
+     * 合并次数
+     */
+    public int mMergeCount = 0;
+    
+    /**
+     * 原始文本（用于合并计算）
+     */
+    public CharSequence mOriginalText = null;
+    
+    /**
+     * 原始字体大小
+     */
+    public float mOriginalTextSize = -1;
 
     /**
      * 重置位 measure

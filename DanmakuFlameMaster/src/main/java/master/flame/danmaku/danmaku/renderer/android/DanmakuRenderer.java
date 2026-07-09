@@ -48,6 +48,21 @@ public class DanmakuRenderer extends Renderer {
     private ICacheManager mCacheManager;
     private OnDanmakuShownListener mOnDanmakuShownListener;
 
+    private final BaseDanmaku[] mLastDrawnDanmakus = new BaseDanmaku[15];
+    private int mLastDrawnIndex = 0;
+    private final java.util.ArrayList<BaseDanmaku> mSpecialDanmakusToDraw = new java.util.ArrayList<>();
+
+    private boolean isExactDuplicate(BaseDanmaku a, BaseDanmaku b) {
+        if (a == b) return false;
+        if (a.getType() != b.getType()) return false;
+        if (Float.compare(a.getLeft(), b.getLeft()) != 0) return false;
+        if (Float.compare(a.getTop(), b.getTop()) != 0) return false;
+        if (a.textColor != b.textColor) return false;
+        if (a.textSize != b.textSize) return false;
+        if (a.text == null || !a.text.equals(b.text)) return false;
+        return true;
+    }
+
     public DanmakuRenderer(DanmakuContext config) {
         mContext = config;
         mDanmakusRetainer = new DanmakusRetainer();
@@ -84,6 +99,14 @@ public class DanmakuRenderer extends Renderer {
         mStartTimer.update(SystemClock.uptimeMillis());
         int sizeInScreen = danmakus.size();
         BaseDanmaku drawItem = null;
+        int specialDanmakuCount = 0;
+        mSpecialDanmakusToDraw.clear();
+        
+        for (int i = 0; i < mLastDrawnDanmakus.length; i++) {
+            mLastDrawnDanmakus[i] = null;
+        }
+        mLastDrawnIndex = 0;
+
         while (itr.hasNext()) {
 
             drawItem = itr.next();
@@ -104,9 +127,21 @@ public class DanmakuRenderer extends Renderer {
                 break;
             }
             
-            if (drawItem.getType() == BaseDanmaku.TYPE_SCROLL_RL){
+            if (drawItem.getType() == BaseDanmaku.TYPE_SCROLL_RL
+                    || drawItem.getType() == BaseDanmaku.TYPE_SCROLL_LR){
                 // 同屏弹幕密度只对滚动弹幕有效
                 orderInScreen++;
+                if (orderInScreen > 150) {
+                    continue;
+                }
+            } else if (drawItem.getType() == BaseDanmaku.TYPE_SPECIAL) {
+                if (drawItem.isOutside()) {
+                    continue;
+                }
+                specialDanmakuCount++;
+                if (specialDanmakuCount > 50) {
+                    continue;
+                }
             }
 
             // measure
@@ -122,6 +157,26 @@ public class DanmakuRenderer extends Renderer {
                 if (drawItem.lines == null && drawItem.getBottom() > disp.getHeight()) {
                     continue;    // skip bottom outside danmaku
                 }
+                
+                boolean isDuplicate = false;
+                for (BaseDanmaku cachedItem : mLastDrawnDanmakus) {
+                    if (cachedItem != null && isExactDuplicate(cachedItem, drawItem)) {
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+                if (isDuplicate) {
+                    continue;
+                }
+                
+                mLastDrawnDanmakus[mLastDrawnIndex] = drawItem;
+                mLastDrawnIndex = (mLastDrawnIndex + 1) % mLastDrawnDanmakus.length;
+
+                if (drawItem.getType() == BaseDanmaku.TYPE_SPECIAL) {
+                    mSpecialDanmakusToDraw.add(drawItem);
+                    continue;
+                }
+
                 int renderingType = drawItem.draw(disp);
                 if(renderingType == IRenderer.CACHE_RENDERING) {
                     mRenderingState.cacheHitCount++;
@@ -141,6 +196,27 @@ public class DanmakuRenderer extends Renderer {
                 }
             }
 
+        }
+
+        for (int i = 0; i < mSpecialDanmakusToDraw.size(); i++) {
+            BaseDanmaku specialItem = mSpecialDanmakusToDraw.get(i);
+            int renderingType = specialItem.draw(disp);
+            if(renderingType == IRenderer.CACHE_RENDERING) {
+                mRenderingState.cacheHitCount++;
+            } else if(renderingType == IRenderer.TEXT_RENDERING) {
+                mRenderingState.cacheMissCount++;
+                if (mCacheManager != null) {
+                    mCacheManager.addDanmaku(specialItem);
+                }
+            }
+            mRenderingState.addCount(specialItem.getType(), 1);
+            mRenderingState.addTotalCount(1);
+
+            if (mOnDanmakuShownListener != null
+                    && specialItem.firstShownFlag != mContext.mGlobalFlagValues.FIRST_SHOWN_RESET_FLAG) {
+                specialItem.firstShownFlag = mContext.mGlobalFlagValues.FIRST_SHOWN_RESET_FLAG;
+                mOnDanmakuShownListener.onDanmakuShown(specialItem);
+            }
         }
         
         mRenderingState.nothingRendered = (mRenderingState.totalDanmakuCount == 0);

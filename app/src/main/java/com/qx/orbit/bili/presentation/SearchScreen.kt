@@ -56,7 +56,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.material3.Text as Material3Text
 import com.qx.orbit.bili.data.model.*
 import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
 import com.qx.orbit.bili.presentation.viewmodel.SearchTab
@@ -147,7 +146,7 @@ fun SearchInputScreen(navController: NavHostController) {
                         value = searchText,
                         onValueChange = { searchText = it },
                         placeholder = {
-                            Material3Text("搜你所想", color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("搜你所想", color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(50.dp),
@@ -430,12 +429,8 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                     .height(28.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .clickable { 
-                        if (showTabMenu) {
-                            showTabMenu = false
-                        } else {
-                            showTabMenu = true
-                        }
+                    .clickable {
+                        showTabMenu = !showTabMenu
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -532,7 +527,7 @@ fun SearchResultScreen(viewModel: SearchViewModel, query: String, navController:
                                             val aid = if (!isBv) trimmed.lowercase().removePrefix("av").toLong() else BilibiliIDConverter.bvToAid(trimmed)
                                             navController.navigate("detail/$bvid/$aid")
                                         } else {
-                                            val encodedQuery = java.net.URLEncoder.encode(trimmed, java.nio.charset.StandardCharsets.UTF_8.toString())
+                                            val encodedQuery = URLEncoder.encode(trimmed, StandardCharsets.UTF_8.toString())
                                             navController.navigate("search_result/$encodedQuery") {
                                                 popUpTo("search") { inclusive = false }
                                             }

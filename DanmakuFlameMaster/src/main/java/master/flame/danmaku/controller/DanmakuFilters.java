@@ -420,16 +420,33 @@ public class DanmakuFilters {
             if (passedDanmakus.contains(danmaku)) {
                 return false;
             }
-            if (currentDanmakus.containsKey(danmaku.text)) {
-                currentDanmakus.put(String.valueOf(danmaku.text), danmaku);
-                blockedDanmakus.removeItem(danmaku);
-                blockedDanmakus.addItem(danmaku);
-                return true;
-            } else {
-                currentDanmakus.put(String.valueOf(danmaku.text), danmaku);
-                passedDanmakus.addItem(danmaku);
-                return false;
+            String textStr = String.valueOf(danmaku.text);
+            if (currentDanmakus.containsKey(textStr)) {
+                BaseDanmaku original = currentDanmakus.get(textStr);
+                if (original != null && !original.isTimeOut()) {
+                    original.mMergeCount++;
+                    original.text = original.mOriginalText + " (x" + (original.mMergeCount + 1) + ")";
+                    
+                    float scale = 1.0f + Math.min(original.mMergeCount * 0.1f, 0.5f);
+                    original.textSize = original.mOriginalTextSize * scale;
+                    
+                    original.measureResetFlag++;
+                    original.requestFlags |= BaseDanmaku.FLAG_REQUEST_REMEASURE | BaseDanmaku.FLAG_REQUEST_INVALIDATE;
+                    if (original.cache != null) {
+                        original.cache.destroy();
+                        original.cache = null;
+                    }
+                    
+                    blockedDanmakus.removeItem(danmaku);
+                    blockedDanmakus.addItem(danmaku);
+                    return true;
+                }
             }
+            danmaku.mOriginalText = danmaku.text;
+            danmaku.mOriginalTextSize = danmaku.textSize;
+            currentDanmakus.put(textStr, danmaku);
+            passedDanmakus.addItem(danmaku);
+            return false;
 
         }
 

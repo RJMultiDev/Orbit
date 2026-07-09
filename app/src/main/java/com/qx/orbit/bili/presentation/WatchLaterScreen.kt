@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -33,17 +34,15 @@ import com.qx.orbit.bili.R
 import com.qx.orbit.bili.presentation.ui.components.RecommendVideoCard
 import com.qx.orbit.bili.presentation.ui.components.WysTimeText
 import com.qx.orbit.bili.presentation.util.rememberSafeRotaryScrollableBehavior
-import com.qx.orbit.bili.presentation.viewmodel.HistoryViewModel
+import com.qx.orbit.bili.presentation.viewmodel.WatchLaterViewModel
 import androidx.wear.compose.material3.SwipeToReveal
 import androidx.wear.compose.material3.SwipeToRevealDefaults
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.wear.compose.material3.Icon
-import androidx.wear.compose.material3.Text
 
 @Composable
-fun HistoryScreen(
-    viewModel: HistoryViewModel,
+fun WatchLaterScreen(
+    viewModel: WatchLaterViewModel,
     navController: NavController
 ) {
     val items by viewModel.items.collectAsState()
@@ -67,7 +66,7 @@ fun HistoryScreen(
                 ListHeader(
                     transformation = SurfaceTransformation(transformationSpec)
                 ) {
-                    Text("历史记录", color = MaterialTheme.colorScheme.primary)
+                    Text("稍后再看", color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -85,7 +84,7 @@ fun HistoryScreen(
                             modifier = Modifier.height(96.dp)
                         )
                         Text(
-                            text = "暂无历史记录",
+                            text = "暂无稍后再看",
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 5.dp),
@@ -107,13 +106,13 @@ fun HistoryScreen(
                         .animateItem(),
                     primaryAction = {
                         PrimaryActionButton(
-                            onClick = { viewModel.deleteHistoryItem(item.kid) },
+                            onClick = { viewModel.deleteItem(item.aid) },
                             icon = { Icon(Icons.Default.Delete, contentDescription = "删除") },
                             text = { Text("删除") },
                             modifier = Modifier.height(SwipeToRevealDefaults.LargeActionButtonHeight)
                         )
                     },
-                    onSwipePrimaryAction = { viewModel.deleteHistoryItem(item.kid) }
+                    onSwipePrimaryAction = { viewModel.deleteItem(item.aid) }
                 ) {
                     RecommendVideoCard(
                         item = item,

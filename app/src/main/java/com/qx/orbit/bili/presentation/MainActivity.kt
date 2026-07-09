@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Recommend
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -356,6 +357,10 @@ fun WearApp(viewModel: MainViewModel = viewModel()) {
                     val historyViewModel: com.qx.orbit.bili.presentation.viewmodel.HistoryViewModel = viewModel()
                     HistoryScreen(viewModel = historyViewModel, navController = navController)
                 }
+                composable("watch_later") {
+                    val watchLaterViewModel: com.qx.orbit.bili.presentation.viewmodel.WatchLaterViewModel = viewModel()
+                    WatchLaterScreen(viewModel = watchLaterViewModel, navController = navController)
+                }
                 composable("reply_detail") {
                     val reply = navController.previousBackStackEntry?.savedStateHandle?.get<Reply>("reply")
                     val replyDetailViewModel: ReplyDetailViewModel = viewModel()
@@ -659,26 +664,6 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
                                 Button(
                                     onClick = {
                                         showTabMenu = false
-                                        navController.navigate("download_manager")
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        contentColor = MaterialTheme.colorScheme.onSurface
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .transformedHeight(this, menuTransformationSpec),
-                                    transformation = SurfaceTransformation(menuTransformationSpec)
-                                ) {
-                                    Icon(Icons.Default.Cached, modifier = Modifier.size(20.dp), contentDescription = "缓存管理")
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("缓存")
-                                }
-                            }
-                            item {
-                                Button(
-                                    onClick = {
-                                        showTabMenu = false
                                         navController.navigate("follow_list")
                                     },
                                     colors = ButtonDefaults.buttonColors(
@@ -733,6 +718,46 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
                                     Icon(Icons.Default.History, modifier = Modifier.size(20.dp), contentDescription = "历史记录")
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("历史")
+                                }
+                            }
+                            item {
+                                Button(
+                                    onClick = {
+                                        showTabMenu = false
+                                        navController.navigate("watch_later")
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .transformedHeight(this, menuTransformationSpec),
+                                    transformation = SurfaceTransformation(menuTransformationSpec)
+                                ) {
+                                    Icon(Icons.Default.Schedule, modifier = Modifier.size(20.dp), contentDescription = "稍后再看")
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("稍后再看")
+                                }
+                            }
+                            item {
+                                Button(
+                                    onClick = {
+                                        showTabMenu = false
+                                        navController.navigate("download_manager")
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .transformedHeight(this, menuTransformationSpec),
+                                    transformation = SurfaceTransformation(menuTransformationSpec)
+                                ) {
+                                    Icon(Icons.Default.Cached, modifier = Modifier.size(20.dp), contentDescription = "缓存管理")
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("缓存")
                                 }
                             }
                             item {

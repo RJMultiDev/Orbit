@@ -260,7 +260,17 @@ class PlayerDanmuClientListener(
 
                 val id = try { extraObj?.optString("id_str", "") ?: "" } catch (_: Exception) { "" }
                 val displayText = if (senderName.isNotEmpty()) "$senderName：$message" else message
-                callback.addDanmaku(displayText, 0xFFFFFF, senderName = senderName, emotes = emotes, singleEmote = singleEmote, id = id)
+                var type = try { first?.optInt(1, 1) ?: 1 } catch (_: Exception) { 1 }
+                val enableAdvanced = SharedPreferencesUtil.getBoolean("player_danmaku_advanced_enable", true)
+                if (!enableAdvanced && (type == 7 || type == 8)) {
+                    type = 1
+                }
+                
+                val textSize = try { first?.optInt(2, 25) ?: 25 } catch (_: Exception) { 25 }
+                val rawColor = try { first?.optInt(3, 0xFFFFFF) ?: 0xFFFFFF } catch (_: Exception) { 0xFFFFFF }
+                val color = rawColor or 0xFF000000.toInt()
+                
+                callback.addDanmaku(displayText, color = color, textSize = textSize, type = type, senderName = senderName, emotes = emotes, singleEmote = singleEmote, id = id)
             }
             cmd == "WATCHED_CHANGE" -> {
                 val data = json.optJSONObject("data")

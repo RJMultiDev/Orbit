@@ -24,7 +24,8 @@ object ReplyApi {
     internal data class ReplyListData(
         @SerializedName("replies") val replies: List<ReplyRootData>? = null,
         @SerializedName("top_replies") val top_replies: List<ReplyRootData>? = null,
-        @SerializedName("page") val page: PageData? = null
+        @SerializedName("page") val page: PageData? = null,
+        @SerializedName("upper") val upper: UpperData? = null
     )
 
     internal data class PageData(
@@ -36,7 +37,8 @@ object ReplyApi {
     internal data class ReplyLazyData(
         @SerializedName("replies") val replies: List<ReplyRootData>? = null,
         @SerializedName("top_replies") val top_replies: List<ReplyRootData>? = null,
-        @SerializedName("cursor") val cursor: CursorData? = null
+        @SerializedName("cursor") val cursor: CursorData? = null,
+        @SerializedName("upper") val upper: UpperData? = null
     )
 
     internal data class CursorData(
@@ -48,6 +50,10 @@ object ReplyApi {
 
     internal data class PaginationReply(
         @SerializedName("next_offset") val next_offset: String? = null
+    )
+
+    internal data class UpperData(
+        @SerializedName("mid") val mid: Long = 0
     )
 
     internal data class ReplyRootData(
@@ -166,9 +172,10 @@ object ReplyApi {
         }
         android.util.Log.d("BiliApi", "getReplies replies=${resp.data.replies?.size} top=${resp.data.top_replies?.size}")
         val isDynamic = type == REPLY_TYPE_DYNAMIC || type == REPLY_TYPE_DYNAMIC_CHILD
-        val normalList = resp.data.replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid) } ?: emptyList()
+        val upMid = resp.data.upper?.mid ?: 0L
+        val normalList = resp.data.replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid, upMid) } ?: emptyList()
         if (pageNumber == 1) {
-            val topList = resp.data.top_replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid) } ?: emptyList()
+            val topList = resp.data.top_replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid, upMid).copy(isTop = true) } ?: emptyList()
             val topIds = topList.map { it.rpid }.toSet()
             android.util.Log.d("BiliApi", "getReplies result: top=${topList.size} normal=${normalList.size}")
             topList + normalList.filter { it.rpid !in topIds }
@@ -210,10 +217,11 @@ object ReplyApi {
         }
         android.util.Log.d("BiliApi", "getRepliesLazy replies=${resp.data.replies?.size} top=${resp.data.top_replies?.size}")
         val isDynamic = type == REPLY_TYPE_DYNAMIC || type == REPLY_TYPE_DYNAMIC_CHILD
+        val upMid = resp.data.upper?.mid ?: 0L
         val count = resp.data.cursor?.all_count ?: 0
         val nextOffset = resp.data.cursor?.pagination_reply?.next_offset
-        val topList = resp.data.top_replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid) } ?: emptyList()
-        val normalList = resp.data.replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid) } ?: emptyList()
+        val topList = resp.data.top_replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid, upMid).copy(isTop = true) } ?: emptyList()
+        val normalList = resp.data.replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid, upMid) } ?: emptyList()
         val topIds = topList.map { it.rpid }.toSet()
         val filtered = normalList.filter { it.rpid !in topIds && it.rpid != rpid }
         Triple(count, nextOffset, topList + filtered)
@@ -249,7 +257,7 @@ object ReplyApi {
         if (resp == null) return@withContext Pair(-1, null)
         if (!resp.isSuccess) return@withContext Pair(resp.code, null)
         val isDynamic = type == REPLY_TYPE_DYNAMIC || type == REPLY_TYPE_DYNAMIC_CHILD
-        val reply = resp.data?.let { parseReply(it, isDynamic, oid) }
+        val reply = resp.data?.let { parseReply(it, isDynamic, oid, 0L) }
         Pair(0, reply)
     }
 
@@ -278,7 +286,7 @@ object ReplyApi {
         resp.data.count
     }
 
-    private fun parseReply(data: ReplyRootData, isDynamic: Boolean, oid: Long): Reply {
+    private fun parseReply(data: ReplyRootData, isDynamic: Boolean, oid: Long, upMid: Long): Reply {
         val mid = data.member?.mid?.toLongOrNull() ?: 0
         val sender = UserInfo(
             mid = mid,
@@ -296,7 +304,7 @@ object ReplyApi {
         val pubTime = if (data.ctime > 0) {
             formatBiliTime(data.ctime)
         } else ""
-        val childList = data.replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid) } ?: emptyList()
+        val childList = data.replies?.filterNotNull()?.map { parseReply(it, isDynamic, oid, upMid) } ?: emptyList()
         return Reply(
             rpid = data.rpid,
             oid = data.oid,
@@ -314,6 +322,7 @@ object ReplyApi {
             isDynamic = isDynamic,
             childMsgList = childList,
             isTop = data.reply_control?.is_top ?: false,
+            isUp = upMid > 0L && mid == upMid,
             emotes = data.content?.emote?.mapValues { 
                 Emote(
                     id = it.value.id,

@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +68,7 @@ fun DownloadManagerScreen(navController: NavController) {
 
     val listState = rememberTransformingLazyColumnState()
     val transformationSpec = rememberTransformationSpec()
-    val isRound = context.resources.configuration.isScreenRound
+    val isRound = LocalConfiguration.current.isScreenRound
 
     ScreenScaffold(
         scrollState = listState
@@ -273,7 +274,7 @@ fun DownloadManagerScreen(navController: NavController) {
                     }
                 } else {
                     item {
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(30.dp))
                     }
                 }
             }

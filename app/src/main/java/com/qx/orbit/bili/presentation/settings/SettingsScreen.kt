@@ -377,6 +377,7 @@ fun SettingApsisPlayerScreen(navController: NavController) {
                 Triple("player_doublemove", "缩放时可移动", true),
                 Triple("player_one_finger_zoom", "单指缩放", false),
                 Triple("player_danmaku_default_show", "弹幕默认开启", true),
+                Triple("player_danmaku_advanced_enable", "启用高级弹幕", true),
                 Triple("player_danmaku_allowoverlap", "弹幕允许重叠", true),
                 Triple("player_danmaku_mergeduplicate", "合并重复弹幕", false),
                 Triple("player_danmaku_showsender", "显示直播弹幕发送者", true),

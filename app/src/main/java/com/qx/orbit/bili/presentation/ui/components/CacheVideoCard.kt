@@ -30,6 +30,13 @@ import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.ProgressIndicatorDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.runtime.getValue
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.qx.orbit.bili.util.VideoDownloadManager
@@ -149,7 +156,27 @@ fun CacheVideoCard(
                     } else "--:--"
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (statusText == null) {
+                        if (item.status == android.app.DownloadManager.STATUS_RUNNING) {
+                            val targetProgress = if (item.totalBytes > 0) {
+                                (item.downloadedBytes.toFloat() / item.totalBytes.toFloat()).coerceIn(0f, 1f)
+                            } else 0f
+                            
+                            val animatedProgress by animateFloatAsState(
+                                targetValue = targetProgress,
+                                animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
+                                label = "progress"
+                            )
+                            
+                            CircularProgressIndicator(
+                                progress = { animatedProgress },
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                colors = ProgressIndicatorDefaults.colors(
+                                    indicatorColor = MaterialTheme.colorScheme.primary,
+                                    trackColor = Color.White.copy(alpha = 0.2f)
+                                )
+                            )
+                        } else if (statusText == null) {
                             Text(
                                 text = formattedDuration,
                                 style = MaterialTheme.typography.labelSmall.copy(

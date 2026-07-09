@@ -5,10 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,10 +26,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -169,6 +176,27 @@ fun ReplyCard(
                     isVip = (reply.sender?.vip_role ?: 0) > 0
                 )
                 Spacer(modifier = Modifier.width(6.dp))
+                if (reply.isUp) {
+                    Box(
+                        modifier = Modifier
+                            .height(14.dp)
+                            .background(BiliPink, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = 5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "UP",
+                            color = Color.White,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 8.sp,
+                            style = androidx.compose.ui.text.TextStyle(
+                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 UserNameText(
                     name = reply.sender?.name ?: "",
                     isVip = (reply.sender?.vip_role ?: 0) > 0,
@@ -330,16 +358,50 @@ fun ReplyCard(
                 ) {
                     previewList.forEachIndexed { index, child ->
                         val childName = child.sender?.name ?: ""
-                        val (richText, inlineContent) = parseRichText(child.message, child.emotes, child.members, resolvedB23Links)
+                        val (richText, parsedInlineContent) = parseRichText(child.message, child.emotes, child.members, resolvedB23Links)
+                        val finalInlineContent = if (child.isUp) {
+                            parsedInlineContent + mapOf(
+                                "UP_TAG" to InlineTextContent(
+                                    Placeholder(
+                                        width = 22.sp,
+                                        height = 14.sp,
+                                        placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
+                                    )
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(BiliPink, RoundedCornerShape(percent = 50)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "UP", 
+                                            color = Color.White, 
+                                            fontSize = 8.sp, 
+                                            fontWeight = FontWeight.Bold,
+                                            lineHeight = 8.sp,
+                                            style = androidx.compose.ui.text.TextStyle(
+                                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                                            )
+                                        )
+                                    }
+                                }
+                            )
+                        } else parsedInlineContent
+
                         Text(
                             text = buildAnnotatedString {
+                                if (child.isUp) {
+                                    appendInlineContent("UP_TAG", "[UP]")
+                                    append(" ")
+                                }
                                 withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
                                     append(childName)
                                 }
                                 append(": ")
                                 append(richText)
                             },
-                            inlineContent = inlineContent,
+                            inlineContent = finalInlineContent,
                             style = MaterialTheme.typography.bodySmall.copy(lineHeight = TextUnit.Unspecified),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
