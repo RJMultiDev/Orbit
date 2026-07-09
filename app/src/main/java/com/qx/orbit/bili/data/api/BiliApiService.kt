@@ -226,6 +226,13 @@ interface BiliApiService {
         @Field("csrf") csrf: String
     ): Result<JsonElement>
 
+    @FormUrlEncoded
+    @POST("https://api.bilibili.com/x/v2/history/delete")
+    suspend fun deleteHistory(
+        @Field("kid") kid: String,
+        @Field("csrf") csrf: String
+    ): Result<JsonElement>
+
     // ===== Watch Later =====
 
     @GET("https://api.bilibili.com/x/v2/history/toview/web")

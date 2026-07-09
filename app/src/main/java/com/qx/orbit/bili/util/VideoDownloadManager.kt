@@ -102,7 +102,7 @@ object VideoDownloadManager {
                             url = "",
                             title = title,
                             filename = f.name,
-                            type = if (f.name.endsWith(".aac")) "AUDIO_AND_SUBTITLE" else "MP4",
+                            type = if (f.name.endsWith(".aac") || f.name.endsWith(".m4s")) "AUDIO_AND_SUBTITLE" else "MP4",
                             status = DownloadManager.STATUS_SUCCESSFUL,
                             downloadedBytes = f.length(),
                             totalBytes = f.length(),
@@ -259,6 +259,8 @@ object VideoDownloadManager {
 
         if (existingLength > 0) {
             requestBuilder.header("Range", "bytes=$existingLength-")
+        } else {
+            requestBuilder.header("Range", "bytes=0-")
         }
 
         val call = client.newCall(requestBuilder.build())

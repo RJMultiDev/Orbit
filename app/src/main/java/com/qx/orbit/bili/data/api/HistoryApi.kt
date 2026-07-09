@@ -112,18 +112,33 @@ object HistoryApi {
                             bvid = bvid,
                             cid = item.history?.cid ?: item.cid,
                             seasonId = if (type == "bangumi") item.kid else 0,
-                            progressPercent = progressPercent
+                            progressPercent = progressPercent,
+                            kid = "${item.history?.business ?: "archive"}_${item.history?.oid ?: item.kid}"
                         )
                     )
                 }
 
+                val max = parsed.data.cursor?.max ?: 0L
+                val isEnd = parsed.data.list.isNullOrEmpty() || max == 0L
+
                 ApiResult(
                     code = parsed.code,
-                    offset = parsed.data.cursor?.max ?: 0,
+                    offset = max,
                     timestamp = parsed.data.cursor?.view_at ?: 0,
                     business = parsed.data.cursor?.business ?: "",
-                    isBottom = parsed.data.cursor?.is_end ?: (parsed.data.list.isNullOrEmpty())
+                    isBottom = isEnd
                 )
+            }
+            is Result.Error -> ApiResult(code = resp.exception.code, message = resp.exception.message ?: "")
+        }
+    }
+
+    suspend fun deleteHistory(kid: String): ApiResult = withContext(Dispatchers.IO) {
+        when (val resp = api.deleteHistory(kid, CookieManager.getCsrf())) {
+            is Result.Success -> {
+                val parsed = GsonConfig.gson.fromJson<ApiResponse<Any>>(resp.data, object : TypeToken<ApiResponse<Any>>() {}.type)
+                if (parsed.code == 0) ApiResult(code = 0)
+                else ApiResult(code = parsed.code, message = parsed.message ?: "")
             }
             is Result.Error -> ApiResult(code = resp.exception.code, message = resp.exception.message ?: "")
         }

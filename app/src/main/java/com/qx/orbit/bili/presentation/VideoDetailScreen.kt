@@ -24,10 +24,15 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.text.ClickableText
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +53,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -79,6 +85,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -130,6 +137,8 @@ import com.qx.orbit.bili.presentation.ui.components.RoundToast
 import com.qx.orbit.bili.presentation.ui.components.UserAvatar
 import com.qx.orbit.bili.presentation.ui.components.UserNameText
 import com.qx.orbit.bili.presentation.viewmodel.VideoDetailViewModel
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.Schedule
 import com.qx.orbit.bili.util.SharedPreferencesUtil
 import com.qx.orbit.bili.util.formatCount
 import com.qx.orbit.bili.util.VideoDownloadManager
@@ -142,6 +151,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long, viewModel: VideoDetailViewModel = viewModel()) {
+    val vmd = viewModel
     LaunchedEffect(bvid, aid) {
         viewModel.loadData(bvid, aid)
     }
@@ -239,10 +249,11 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                         onClick = {
                             val info = videoInfo
                             if (info != null) {
+                                val safeTitle = info.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
                                 VideoDownloadManager.enqueue(
                                     url = "", // Will be fetched inside manager
                                     title = info.title,
-                                    filename = "${info.title}_$qn.mp4",
+                                    filename = "${safeTitle}_$qn.mp4",
                                     context = context,
                                     aid = aid,
                                     cid = info.cids.firstOrNull() ?: 0L,
@@ -268,10 +279,11 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                         onClick = {
                             val info = videoInfo
                             if (info != null) {
+                                val safeTitle = info.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
                                 VideoDownloadManager.enqueue(
                                     url = "",
                                     title = info.title,
-                                    filename = "${info.title}_audio.mp4",
+                                    filename = "${safeTitle}_audio.m4s",
                                     context = context,
                                     aid = aid,
                                     cid = info.cids.firstOrNull() ?: 0L,
@@ -378,6 +390,7 @@ fun VideoDetailScreen(navController: NavHostController, bvid: String, aid: Long,
                                 viewModel.loadFavoriteFolders()
                                 showFavDialog = true
                             },
+                            onWatchLaterClick = { viewModel.addToWatchLater(context) },
                             onUpClick = { mid -> navController.navigate("user_space/$mid") },
                             onCacheClick = {
                                 showCacheDialog = true
@@ -730,6 +743,7 @@ fun VideoInfoPage(
     onTripleClick: () -> Unit,
     onCoinClick: () -> Unit,
     onFavClick: () -> Unit,
+    onWatchLaterClick: () -> Unit,
     onCacheClick: () -> Unit,
     onUpClick: (Long) -> Unit
 ) {
@@ -875,46 +889,54 @@ fun VideoInfoPage(
                             }
                             .fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Filled.PlayCircleOutline,
-                                contentDescription = "Views",
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(
-                                text = formatCount(videoInfo.stats?.view ?: 0),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(
-                                painterResource(R.drawable.ic_danmaku),
-                                contentDescription = "Danmaku",
-                                modifier = Modifier.height(14.dp),
-                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(
-                                text = formatCount(videoInfo.stats?.danmaku ?: 0),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                            )
-                            if ((videoInfo.history?.progress ?: 0) > 0) {
-                                Spacer(modifier = Modifier.width(8.dp))
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = Icons.Filled.History,
-                                    contentDescription = "History",
+                                    imageVector = Icons.Filled.PlayCircleOutline,
+                                    contentDescription = "Views",
                                     modifier = Modifier.size(14.dp),
                                     tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                                 )
                                 Spacer(modifier = Modifier.width(2.dp))
                                 Text(
-                                    text = "看到 ${StringUtil.toTime(videoInfo.history!!.progress)}",
+                                    text = formatCount(videoInfo.stats?.view ?: 0),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                                 )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painterResource(R.drawable.ic_danmaku),
+                                    contentDescription = "Danmaku",
+                                    modifier = Modifier.height(14.dp),
+                                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = formatCount(videoInfo.stats?.danmaku ?: 0),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                )
+                            }
+                            if ((videoInfo.history?.progress ?: 0) > 0) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Filled.History,
+                                        contentDescription = "History",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(
+                                        text = "看到 ${StringUtil.toTime(videoInfo.history!!.progress)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                    )
+                                }
                             }
                         }
 
@@ -969,7 +991,28 @@ fun VideoInfoPage(
                     if (videoInfo.description.isNotEmpty() || tags.isNotEmpty()) {
                         val fullDesc = buildAnnotatedString {
                             if (videoInfo.description.isNotEmpty()) {
-                                append(videoInfo.description)
+                                val htmlRegex = "<a\\s+(?:[^>]*?\\s+)?href=([\"'])(.*?)\\1[^>]*>(.*?)</a>".toRegex(RegexOption.IGNORE_CASE)
+                                var lastIndex = 0
+                                htmlRegex.findAll(videoInfo.description).forEach { matchResult ->
+                                    val start = matchResult.range.first
+                                    val url = matchResult.groupValues[2]
+                                    val linkText = matchResult.groupValues[3]
+                                    
+                                    if (start > lastIndex) {
+                                        append(videoInfo.description.substring(lastIndex, start))
+                                    }
+                                    
+                                    pushStringAnnotation(tag = "URL", annotation = url)
+                                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline)) {
+                                        append(linkText)
+                                    }
+                                    pop()
+                                    
+                                    lastIndex = matchResult.range.last + 1
+                                }
+                                if (lastIndex < videoInfo.description.length) {
+                                    append(videoInfo.description.substring(lastIndex))
+                                }
                             }
                             if (tags.isNotEmpty()) {
                                 if (videoInfo.description.isNotEmpty()) {
@@ -982,12 +1025,13 @@ fun VideoInfoPage(
                             }
                         }
                         
-                        Text(
+                        ClickableText(
                             text = fullDesc,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp
+                            ),
                             maxLines = if (isDescExpanded) Int.MAX_VALUE else 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
@@ -999,8 +1043,19 @@ fun VideoInfoPage(
                                         }
                                     }
                                 }
-                                .fillMaxWidth()
-                                .clickable { isDescExpanded = !isDescExpanded }
+                                .fillMaxWidth(),
+                            onClick = { offset ->
+                                val urlAnnotations = fullDesc.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                                if (urlAnnotations.isNotEmpty()) {
+                                    val url = urlAnnotations.first().item
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {}
+                                } else {
+                                    isDescExpanded = !isDescExpanded
+                                }
+                            }
                         )
                     }
                 }
@@ -1040,7 +1095,7 @@ fun VideoInfoPage(
                             val vibrateJob = launch {
                                 while (tripleProgress.value < 1f) {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    delay(150)
+                                    delay(75)
                                 }
                             }
                             tripleProgress.animateTo(
@@ -1176,6 +1231,27 @@ fun VideoInfoPage(
                         }
                     }
                 }
+                item { Spacer(modifier = Modifier.height(1.dp)) }
+
+                // Watch Later Button
+                item {
+                    val context = LocalContext.current
+                    Button(
+                        onClick = onWatchLaterClick,
+                        modifier = Modifier
+                            .transformedHeight(this, transformationSpec)
+                            .fillMaxWidth().padding(horizontal = 8.dp),
+                        icon = { Icon(Icons.Default.Schedule, contentDescription = "Watch Later", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) },
+                        transformation = SurfaceTransformation(transformationSpec),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Text("添加到稍后再看")
+                    }
+                }
+                
                 item { Spacer(modifier = Modifier.height(1.dp)) }
                 
                 // Cache Button

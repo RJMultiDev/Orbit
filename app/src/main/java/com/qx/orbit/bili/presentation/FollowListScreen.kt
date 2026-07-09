@@ -186,7 +186,7 @@ fun FollowListScreen(
             }
 
             if (!videoList.isEmpty()) {
-                item { Spacer(modifier = Modifier.height(40.dp)) }
+                item { Spacer(modifier = Modifier.height(30.dp)) }
             }
 
         }

@@ -1,28 +1,52 @@
 package com.qx.orbit.bili.data.api
 
 object BilibiliIDConverter {
-    private const val TABLE = "fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF"
-    private val S = intArrayOf(11, 10, 3, 8, 4, 6)
-    private const val XOR = 177451812L
-    private const val ADD = 8728348608L
-    private val TR = HashMap<Char, Int>().apply {
-        for (i in 0 until 58) this[TABLE[i]] = i
-    }
+    private const val XOR_CODE = 23442827791579L
+    private const val MASK_CODE = 2251799813685247L
+    private const val MAX_AID = 1L shl 51
+    private const val BASE = 58L
+    private const val DATA = "FcwAPNKTMug3GV5Lj7EJnHpWsx4tb8haYeviqBz6rkCy12mUSDQX9RdoZf"
 
     fun bvToAid(bv: String): Long {
-        var x = 0L
-        for (i in 0 until 6) {
-            TR[bv[S[i]]]?.let { x += (it.toLong() * Math.pow(58.0, i.toDouble())).toLong() }
+        if (!bv.startsWith("BV1") || bv.length < 12) return 0L
+        val bvidArr = bv.toCharArray()
+        
+        val temp1 = bvidArr[3]
+        bvidArr[3] = bvidArr[9]
+        bvidArr[9] = temp1
+
+        val temp2 = bvidArr[4]
+        bvidArr[4] = bvidArr[7]
+        bvidArr[7] = temp2
+
+        var tmp = 0L
+        for (i in 3 until bvidArr.size) {
+            val idx = DATA.indexOf(bvidArr[i])
+            if (idx != -1) {
+                tmp = tmp * BASE + idx
+            }
         }
-        return (x - ADD) xor XOR
+        return (tmp and MASK_CODE) xor XOR_CODE
     }
 
     fun aidToBv(aid: Long): String {
-        var x = (aid xor XOR) + ADD
-        val r = StringBuilder("BV1  4 1 7  ")
-        for (i in 0 until 6) {
-            r.setCharAt(S[i], TABLE[((x / Math.pow(58.0, i.toDouble())) % 58).toInt()])
+        val bytes = charArrayOf('B', 'V', '1', '0', '0', '0', '0', '0', '0', '0', '0', '0')
+        var bvIndex = bytes.size - 1
+        var tmp = (MAX_AID or aid) xor XOR_CODE
+        while (tmp > 0) {
+            bytes[bvIndex] = DATA[(tmp % BASE).toInt()]
+            tmp /= BASE
+            bvIndex--
         }
-        return r.toString()
+        
+        val temp1 = bytes[3]
+        bytes[3] = bytes[9]
+        bytes[9] = temp1
+
+        val temp2 = bytes[4]
+        bytes[4] = bytes[7]
+        bytes[7] = temp2
+
+        return String(bytes)
     }
 }

@@ -9,9 +9,12 @@ import com.qx.orbit.bili.data.api.ReplyApi
 import com.qx.orbit.bili.data.api.VideoInfoApi
 import com.qx.orbit.bili.data.model.Reply
 import com.qx.orbit.bili.data.api.PlayerApi
+import com.qx.orbit.bili.data.api.WatchLaterApi
 import com.qx.orbit.bili.data.model.VideoCard
 import com.qx.orbit.bili.data.model.VideoInfo
 import com.qx.orbit.bili.data.api.EmoteApi
+import android.content.Context
+import android.widget.Toast
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -329,5 +332,22 @@ class VideoDetailViewModel : ViewModel() {
 
     fun removeReplyLocally(reply: Reply) {
         _replies.value = _replies.value.filter { it.rpid != reply.rpid }
+    }
+
+    fun addToWatchLater(context: Context) {
+        val aid = _videoInfo.value?.aid ?: return
+        viewModelScope.launch {
+            try {
+                val res = WatchLaterApi.addWatchLater(aid)
+                if (res.code == 0) {
+                    Toast.makeText(context, "已添加到稍后再看", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "添加失败: ${res.message}", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "网络异常，添加失败", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }

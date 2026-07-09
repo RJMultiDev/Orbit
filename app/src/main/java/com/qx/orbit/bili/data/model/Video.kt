@@ -42,7 +42,8 @@ data class VideoCard(
     val cid: Long = 0,
     val mid: Long = 0,
     val seasonId: Long = 0,
-    val progressPercent: Float? = null
+    val progressPercent: Float? = null,
+    val kid: String = ""
 )
 
 data class Stats(

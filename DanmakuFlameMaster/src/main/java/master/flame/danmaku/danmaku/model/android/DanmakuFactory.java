@@ -165,6 +165,7 @@ public class DanmakuFactory {
                 break;
             case 7: // 特殊弹幕
                 instance = new SpecialDanmaku();
+                instance.duration = MAX_Duration_Fix_Danmaku != null ? MAX_Duration_Fix_Danmaku : new Duration(COMMON_DANMAKU_DURATION);
                 sSpecialDanmakus.addItem(instance);
                 break;
         }

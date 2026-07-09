@@ -34,6 +34,7 @@ data class Reply(
     val isDynamic: Boolean = false,
     val childMsgList: List<Reply> = emptyList(),
     val isTop: Boolean = false,
+    val isUp: Boolean = false,
     val emotes: Map<String, Emote> = emptyMap(),
     val members: Map<String, Long> = emptyMap()
 ) : Parcelable
