@@ -88,9 +88,10 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.lifecycle.viewmodel.compose)
 
-    // ijkplayer + DFMNext + brotlij
+    // ijkplayer + DFMNext + DanmakuFlameMaster + brotlij
     implementation(project(":ijkplayer-java"))
     implementation(project(":DFMNext"))
+    implementation(project(":DanmakuFlameMaster"))
 
     // Brotli decompression
     implementation(libs.dec)
