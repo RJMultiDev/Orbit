@@ -1,0 +1,10 @@
+{
+  "native": {
+    "targets": [
+      {
+        "name": "entry",
+        "path": "./CMakeLists.txt"
+      }
+    ]
+  }
+}

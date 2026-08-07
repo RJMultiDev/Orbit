@@ -1,0 +1,9 @@
+{
+  "modelVersion": "5.0.0",
+  "description": "Orbit — HarmonyOS NEXT (6.1 / API 22) wearable Bilibili client. 工程级 ohpm 配置。",
+  // Hvigor 构建插件（@ohos/hvigor-ohos-plugin）不在本文件声明，
+  // 而是声明在 hvigor/hvigor-config.json5 的 dependencies 字段，
+  // DevEco Studio 打开工程时会按 hvigor-config.json5 自动解析安装。
+  "dependencies": {},
+  "devDependencies": {}
+}

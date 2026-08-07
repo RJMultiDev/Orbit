@@ -1,0 +1,8 @@
+{
+  "src": [
+    "pages/Home",
+    "pages/Login",
+    "pages/Player",
+    "kuikly/pages/Index"
+  ]
+}

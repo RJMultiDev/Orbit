@@ -1,0 +1,51 @@
+{
+  "app": {
+    "signingConfigs": [
+      // 签名配置占位：初始为空数组（未签名）。
+      // 在 DevEco Studio 中通过 File > Project Structure > Signing Configs
+      // 自动生成或手动配置证书后，DevEco 会把签名配置写入此处，
+      // 并保持下方 products[0].signingConfig 指向 "default"。
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        // 本机实际 SDK：OpenHarmony 6.1.1 / apiVersion 24（Release），
+        // 位于 ~/.local/sdk/default/openharmony（经 ~/.local/sdk/orbit/openharmony/24 新版布局接入）。
+        // 目标设备：手表（wearable）。API 10~25 时 SDK 版本须写成数字。
+        "compileSdkVersion": 24,
+        "compatibleSdkVersion": 24,
+        "runtimeOS": "OpenHarmony",
+        "buildOption": {
+          "strictMode": {
+            // @kuikly-open/render 为 Bytecode HAR，需开启规范化 OHM URL 支持。
+            "useNormalizedOHMUrl": true,
+            "caseSensitiveCheck": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

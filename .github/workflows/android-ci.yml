@@ -1,0 +1,54 @@
+name: Android CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: assembleLiteDebug + lint + unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # DFMNext is a build dependency declared as a git submodule, but
+      # .gitmodules points at an SSH URL. CI has no deploy key, so re-point it
+      # to the HTTPS mirror before pulling.
+      - name: Init DFMNext submodule over HTTPS
+        run: |
+          git submodule init
+          git config submodule.DFMNext.url https://github.com/YNotBili/DFMNext.git
+          git submodule update --init --depth 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Point Gradle at the CI Android SDK
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Set up Gradle (with cache)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build, lint and run JVM unit tests
+        run: ./gradlew :app:assembleLiteDebug :app:lintLiteDebug :app:testLiteDebugUnitTest --stacktrace
+
+      - name: Upload unit test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/
+          if-no-files-found: ignore

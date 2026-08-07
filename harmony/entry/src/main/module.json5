@@ -1,0 +1,50 @@
+{
+  "module": {
+    "name": "entry",
+    "type": "entry",
+    "description": "$string:module_desc",
+    "mainElement": "EntryAbility",
+    "deviceTypes": [
+      // 手表设备形态（HarmonyOS NEXT 6.1 / API 22）
+      "wearable"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "abilities": [
+      {
+        "name": "EntryAbility",
+        "srcEntry": "./ets/entryability/EntryAbility.ets",
+        "description": "$string:EntryAbility_desc",
+        "icon": "$media:app_icon",
+        "label": "$string:EntryAbility_label",
+        "startWindowIcon": "$media:startIcon",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": true,
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home"
+            ],
+            "actions": [
+              "action.system.home"
+            ]
+          }
+        ]
+      }
+    ],
+    "requestPermissions": [
+      // 网络类权限：B 站数据请求必需。
+      {
+        "name": "ohos.permission.INTERNET"
+      },
+      {
+        "name": "ohos.permission.GET_NETWORK_INFO"
+      }
+      // 存储类权限占位：按计划采用应用沙盒，读写自身文件无需权限。
+      // 仅当需要访问系统媒体库（保存/读取公开媒体）时再启用以下项：
+      // { "name": "ohos.permission.READ_MEDIA" },
+      // { "name": "ohos.permission.WRITE_MEDIA" }
+    ]
+  }
+}

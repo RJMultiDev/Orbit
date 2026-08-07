@@ -1,0 +1,42 @@
+# Orbit · shared/ohos 版本锁定表
+#
+# 版本来源（2026-08-07 实测于腾讯 maven 镜像 mirrors.tencent.com/nexus/repository/maven-tencent/）：
+#  - Kuikly 编译插件/库版本格式为 <kuikly>-<kotlin>，Kotlin 2.0.21 线取 2.24.0-2.0.21
+#    （与 ohpm 端 @kuikly-open/render@2.24.0 对齐）；OHOS 库用 -ohos 变体。
+#  - KBA Kotlin fork：2.0.21-KBA-010。
+#  - KNOI（Kotlin-OHOS 编译链插件）：0.0.4（官方 OHOS 构建脚本锁定）。
+#  - KSP：2.0.21-1.0.27（标准 KSP，来自 Maven Central / Google）。
+#  - Compose DSL：org.jetbrains.compose 1.7.3（官方 OHOS 构建锁定）+ Kotlin compose 插件
+#    （version.ref = kotlin，KBA fork 自带）。
+
+[versions]
+# Kotlin Multiplatform（OHOS 定制版 / KBA fork）。
+kotlin = "2.0.21-KBA-010"
+# Kuikly 编译插件（id=com.tencent.kuikly-open.kuikly）与核心库版本前缀（2.0.21 线）。
+kuikly = "2.24.0-2.0.21"
+# OHOS 变体的核心库版本（core / core-annotations / core-ksp / compose）。
+kuiklyOhos = "2.24.0-2.0.21-ohos"
+# KNOI = Kotlin-OHOS 编译链插件。
+knoi = "0.0.4"
+# KSP 版本需与 Kotlin fork 匹配。
+ksp = "2.0.21-1.0.27"
+# org.jetbrains.compose 插件版本（Compose Multiplatform DSL）。
+composePlugin = "1.7.3"
+
+[libraries]
+# KuiklyCore：声明式+响应式 UI 核心，含自研 DSL（Pager/ViewBuilder/Text 等）。
+kuikly-core = { module = "com.tencent.kuikly-open:core", version.ref = "kuiklyOhos" }
+# @Page 等业务注解（core-annotations）。
+kuikly-annotations = { module = "com.tencent.kuikly-open:core-annotations", version.ref = "kuiklyOhos" }
+# @Page 注解处理器（core-ksp）。
+kuikly-ksp = { module = "com.tencent.kuikly-open:core-ksp", version.ref = "kuiklyOhos" }
+# Kuikly Compose-DSL（Compose Multiplatform 风格的跨端 UI DSL）。
+kuikly-compose = { module = "com.tencent.kuikly-open:compose", version.ref = "kuiklyOhos" }
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose = { id = "org.jetbrains.compose", version.ref = "composePlugin" }
+kuikly = { id = "com.tencent.kuikly-open.kuikly", version.ref = "kuikly" }
+knoi = { id = "com.tencent.kuiklybase.knoi.plugin", version.ref = "knoi" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

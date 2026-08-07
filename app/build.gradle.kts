@@ -150,4 +150,8 @@ dependencies {
     implementation(libs.eventbus)
     debugImplementation(libs.ui.test.manifest)
     debugImplementation(libs.ui.tooling)
+
+    // JVM unit tests (Phase 0 test scaffold; no device required)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }

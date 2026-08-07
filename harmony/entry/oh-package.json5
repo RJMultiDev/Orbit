@@ -1,0 +1,19 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "Orbit HarmonyOS NEXT (6.1/API 22) wearable entry module",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    // Kuikly 渲染器 SDK：版本需与 shared/ohos 的 KMP 跨端工程锁定的版本一致
+    // （A06 构建 libshared.so 时使用的 KUIKLY_RENDER_VERSION）。
+    // TODO(A04): 按 docs/harmony-toolchain-lock.md 校正版本号；此处为 ohpm 中心仓
+    // 最新已知版本 2.24.0（2026-06，最低兼容 HarmonyOS API 12，满足 API 22 目标）。
+    "@kuikly-open/render": "2.24.0"
+  },
+  "devDependencies": {
+    // ArkTS 单元测试框架（供 entry/src/ohosTest 使用，A07 创建）。
+    "@ohos/hypium": "1.0.28"
+  }
+}

@@ -1,0 +1,26 @@
+# ohpm / Hvigor 依赖与缓存
+/node_modules
+/oh_modules
+**/node_modules/**
+**/oh_modules/**
+/.hvigor
+**/.hvigor/**
+/.preview
+**/.preview/**
+
+# DevEco Studio
+/.idea
+/local.properties
+
+# 构建产物
+/build
+**/build/**
+
+# shared/ohos 生成的业务原生库（由 shared/ohos/build.sh install 产出，不入库）
+/entry/libs
+/entry/src/main/cpp/libshared_api.h
+
+# 测试/其它
+**/.test
+**/.arkui-x
+.DS_Store

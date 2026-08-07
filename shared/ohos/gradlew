@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Orbit · shared/ohos 独立 Gradle wrapper（Gradle 8.0，配合 JDK 17 运行 KBA 工具链）。
+# 用法：cd shared/ohos && ./gradlew :shared:linkOhosArm64
+DIR=$(cd "$(dirname "$0")" && pwd)
+exec java -classpath "$DIR/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"

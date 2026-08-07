@@ -1,0 +1,23 @@
+{
+  "apiType": "stageMode",
+  "buildOption": {
+    // C++ (NAPI) 原生模块构建说明：指向 entry/src/main/cpp/CMakeLists.txt。
+    // 手表形态仅打 arm64-v8a 一个 ABI。
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      "arguments": "",
+      "cppFlags": "",
+      "abiFilters": [
+        "arm64-v8a"
+      ]
+    }
+  },
+  "targets": [
+    {
+      "name": "default"
+    },
+    {
+      "name": "ohosTest"
+    }
+  ]
+}

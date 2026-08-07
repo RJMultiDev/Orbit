@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Orbit HarmonyOS NEXT (API 22) entry module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Orbit Kuikly renderer entry ability"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Orbit"
+    }
+  ]
+}

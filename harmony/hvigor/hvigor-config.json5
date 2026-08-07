@@ -1,0 +1,8 @@
+{
+  "modelVersion": "5.0.0",
+  "dependencies": {
+    // Hvigor 工程构建插件：与本机安装的 hvigor 6.24.4 配套
+    // （~/hmos-command-line-tools 缺失，实际工具链位于 ~/.local/hvigor，hvigor 6.24.4）。
+    "@ohos/hvigor-ohos-plugin": "6.24.4"
+  }
+}

@@ -15,3 +15,4 @@ app/release/
 /.kotlin/
 /.mimocode/
 /bilibili-API-collect-main/
+/.claude/worktrees/
